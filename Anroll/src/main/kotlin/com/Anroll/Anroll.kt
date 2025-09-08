@@ -130,7 +130,7 @@ class Anroll : MainAPI() {
         }
     }
 
-     override suspend fun loadLinks(
+    override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
@@ -141,13 +141,13 @@ class Anroll : MainAPI() {
         val videoSource = document.selectFirst("video source")?.attr("src")
         if (videoSource != null) {
             callback.invoke(
-                newExtractorLink(
+                ExtractorLink(
                     source = name,
                     name = "Anroll",
                     url = fixUrl(videoSource),
                     referer = mainUrl,
                     quality = Qualities.Unknown.value,
-                    type = ExtractorLinkType.M3U8
+                    isM3u8 = true // This tells it the video is in m3u8 format
                 )
             )
             return true
