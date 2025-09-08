@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
+import java.util.*
 
 class Anroll : MainAPI() {
     override var mainUrl = "https://www.anroll.net"
@@ -147,7 +148,7 @@ class Anroll : MainAPI() {
                     url = fixUrl(videoSource),
                     referer = mainUrl,
                     quality = Qualities.Unknown.value,
-                    isM3u8 = true // This tells it the video is in m3u8 format
+                    isM3u8 = true
                 )
             )
             return true
