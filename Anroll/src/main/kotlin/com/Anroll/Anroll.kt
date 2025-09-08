@@ -2,6 +2,8 @@ package com.Anroll
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
 
 class Anroll : MainAPI() {
@@ -45,11 +47,9 @@ class Anroll : MainAPI() {
         val title = element.selectFirst("h1")?.text()?.trim() ?: return null
         val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
 
-        // Extrai o número do episódio
         val episodeText = element.selectFirst("span.episode-badge b")?.text()
         val episode = episodeText?.toIntOrNull() ?: 1
 
-        // Extrai o tipo de áudio (LEG/DUB) da classe
         val isDub = element.selectFirst("div#labels-column2 div.imwHAL") != null
 
         return newAnimeSearchResponse(title, href, TvType.Anime) {
@@ -73,21 +73,16 @@ class Anroll : MainAPI() {
         val searchUrl = "$mainUrl/?search=$query"
         val document = app.get(searchUrl).document
 
-        val items = mutableListOf<SearchResponse>()
-        document.select("ul.UVrQY li.release-item, ul.ctmcxR li.movielistitem").forEach { element ->
-            val link = element.selectFirst("a[href]") ?: continue
+        return document.select("ul.UVrQY li.release-item, ul.ctmcxR li.movielistitem").mapNotNull { element ->
+            val link = element.selectFirst("a[href]") ?: return@mapNotNull null
             val href = fixUrl(link.attr("href"))
-            val title = element.selectFirst("h1")?.text()?.trim() ?: continue
+            val title = element.selectFirst("h1")?.text()?.trim() ?: return@mapNotNull null
             val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
 
-            items.add(
-                newAnimeSearchResponse(title, href, TvType.Anime) {
-                    this.posterUrl = posterUrl
-                }
-            )
+            newAnimeSearchResponse(title, href, TvType.Anime) {
+                this.posterUrl = posterUrl
+            }
         }
-
-        return items
     }
 
     override suspend fun load(url: String): LoadResponse? {
@@ -99,36 +94,31 @@ class Anroll : MainAPI() {
         val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
         val plot = document.selectFirst("div.sinopse")?.text()
 
-        // Verifica se é uma página de episódio (tem #epinfo) ou de anime (lista de episódios)
         val isEpisodePage = document.selectFirst("div#epinfo h2#current_ep") != null
 
         if (isEpisodePage) {
-            // É uma página de episódio — retorna apenas este episódio
             val episodeText = document.selectFirst("h2#current_ep b")?.text()
             val episode = episodeText?.toIntOrNull() ?: 1
 
             return newAnimeLoadResponse(title, url, TvType.Anime, listOf(
-                Episode(
-                    data = url,
-                    name = "Episódio $episode",
-                    episode = episode
-                )
+                newEpisode(url) {
+                    this.name = "Episódio $episode"
+                    this.episode = episode
+                }
             )) {
                 this.posterUrl = poster
                 this.plot = plot
             }
         } else {
-            // É uma página de anime — lista todos os episódios
             val episodes = document.select("div.epcontrol a").mapIndexed { index, epElement ->
                 val epUrl = epElement.attr("href").let { fixUrl(it) }
                 val epName = epElement.text().trim()
                 val epNum = index + 1
 
-                Episode(
-                    data = epUrl,
-                    name = epName,
-                    episode = epNum
-                )
+                newEpisode(epUrl) {
+                    this.name = epName
+                    this.episode = epNum
+                }
             }
 
             return newAnimeLoadResponse(title, url, TvType.Anime, episodes) {
@@ -139,30 +129,28 @@ class Anroll : MainAPI() {
     }
 
     override suspend fun loadLinks(
-         String,
+        data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
 
-      
         val videoSource = document.selectFirst("video source")?.attr("src")
         if (videoSource != null) {
             callback.invoke(
-                ExtractorLink(
-                    name,
-                    name,
-                    fixUrl(videoSource),
-                    "$mainUrl/",
-                    Qualities.P1080.value, // ou Qualities.Unknown.value
+                newExtractorLink(
+                    source = name,
+                    name = name,
+                    url = fixUrl(videoSource),
+                    referer = "$mainUrl/",
+                    quality = Qualities.P1080.value,
                     headers = mapOf("Referer" to "$mainUrl/")
                 )
             )
             return true
         }
 
-        // Fallback: 
         val iframeSrc = document.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
         if (iframeSrc != null) {
             loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
