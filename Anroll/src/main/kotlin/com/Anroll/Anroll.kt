@@ -2,8 +2,8 @@ package com.Anroll
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
 
 class Anroll : MainAPI() {
@@ -143,11 +143,11 @@ class Anroll : MainAPI() {
                     name,
                     name,
                     fixUrl(videoSource),
-                    "$mainUrl/",
-                    Qualities.P1080.value,
-                    false,
-                    mapOf("Referer" to "$mainUrl/")
-                )
+                    ExtractorLinkType.M3U8
+                ) {
+                    this.referer = "$mainUrl/"
+                    this.quality = Qualities.P1080.value
+                }
             )
             return true
         }
