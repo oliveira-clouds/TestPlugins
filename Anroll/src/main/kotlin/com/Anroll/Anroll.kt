@@ -4,6 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.newExtractorLink 
 import org.jsoup.nodes.Element
 
 class Anroll : MainAPI() {
@@ -85,78 +86,77 @@ class Anroll : MainAPI() {
         }
     }
 
-    override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+   override suspend fun load(url: String): LoadResponse? {
+    val document = app.get(url).document
 
-        val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
-        val title = titleElement.text().trim()
+    val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
+    val title = titleElement.text().trim()
 
-        val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
-        val plot = document.selectFirst("div.sinopse")?.text()
+    val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
+    val plot = document.selectFirst("div.sinopse")?.text()
 
-        val isEpisodePage = document.selectFirst("div#epinfo h2#current_ep") != null
+    val isEpisodePage = document.selectFirst("div#epinfo h2#current_ep") != null
 
-        if (isEpisodePage) {
-            val episodeText = document.selectFirst("h2#current_ep b")?.text()
-            val episode = episodeText?.toIntOrNull() ?: 1
+    if (isEpisodePage) {
+        val episodeText = document.selectFirst("h2#current_ep b")?.text()
+        val episode = episodeText?.toIntOrNull() ?: 1
 
-            return newAnimeLoadResponse(title, url, TvType.Anime, listOf(
-                newEpisode(url) {
-                    this.name = "Episódio $episode"
-                    this.episode = episode
-                }
-            )) {
-                this.posterUrl = poster
-                this.plot = plot
+        return newAnimeLoadResponse(title, url, TvType.Anime, listOf(
+            newEpisode(url) {
+                this.name = "Episódio $episode"
+                this.episode = episode
             }
-        } else {
-            val episodes = document.select("div.epcontrol a").mapIndexed { index, epElement ->
-                val epUrl = epElement.attr("href").let { fixUrl(it) }
-                val epName = epElement.text().trim()
-                val epNum = index + 1
+        )) {
+            this.posterUrl = poster
+            this.plot = plot
+        }  
+    } else {
+        val episodes = document.select("div.epcontrol a").mapIndexed { index, epElement ->
+            val epUrl = epElement.attr("href").let { fixUrl(it) }
+            val epName = epElement.text().trim()
+            val epNum = index + 1
 
-                newEpisode(epUrl) {
-                    this.name = epName
-                    this.episode = epNum
-                }
-            }
-
-            return newAnimeLoadResponse(title, url, TvType.Anime, episodes) {
-                this.posterUrl = poster
-                this.plot = plot
+            newEpisode(epUrl) {
+                this.name = epName
+                this.episode = epNum
             }
         }
-    }
 
+        return newAnimeLoadResponse(title, url, TvType.Anime, episodes) {
+            this.posterUrl = poster
+            this.plot = plot
+        } 
+    }
+}
     override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val document = app.get(data).document
+     String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    val document = app.get(data).document
 
-        val videoSource = document.selectFirst("video source")?.attr("src")
-        if (videoSource != null) {
-            callback.invoke(
-                newExtractorLink(
-                    source = name,
-                    name = name,
-                    url = fixUrl(videoSource),
-                    referer = "$mainUrl/",
-                    quality = Qualities.P1080.value,
-                    headers = mapOf("Referer" to "$mainUrl/")
-                )
+    val videoSource = document.selectFirst("video source")?.attr("src")
+    if (videoSource != null) {
+        callback.invoke(
+            newExtractorLink(  // ✅ IMPORTADO E USADO CORRETAMENTE
+                source = name,
+                name = name,
+                url = fixUrl(videoSource),
+                referer = "$mainUrl/",
+                quality = Qualities.P1080.value,
+                headers = mapOf("Referer" to "$mainUrl/")
             )
-            return true
-        }
-
-        val iframeSrc = document.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
-        if (iframeSrc != null) {
-            loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
-            return true
-        }
-
-        return false
+        )
+        return true
     }
+
+    val iframeSrc = document.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
+    if (iframeSrc != null) {
+        loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
+        return true
+    }
+
+    return false
+}
 }
