@@ -130,7 +130,7 @@ class Anroll : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
+     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
@@ -141,12 +141,13 @@ class Anroll : MainAPI() {
         val videoSource = document.selectFirst("video source")?.attr("src")
         if (videoSource != null) {
             callback.invoke(
-                ExtractorLink(
-                    name,
-                    name,
-                    fixUrl(videoSource),
-                    "$mainUrl/",
-                    ExtractorLinkType.M3U8
+                newExtractorLink(
+                    source = name,
+                    name = "Anroll",
+                    url = fixUrl(videoSource),
+                    referer = mainUrl,
+                    quality = Qualities.Unknown.value,
+                    type = ExtractorLinkType.M3U8
                 )
             )
             return true
@@ -154,7 +155,7 @@ class Anroll : MainAPI() {
 
         val iframeSrc = document.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
         if (iframeSrc != null) {
-            app.loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
+            app.loadExtractor(iframeSrc, mainUrl, subtitleCallback, callback)
             return true
         }
 
