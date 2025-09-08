@@ -103,7 +103,7 @@ class Anroll : MainAPI() {
             return newAnimeLoadResponse(title, url, TvType.Anime) {
                 this.posterUrl = poster
                 this.plot = plot
-                addEpisodes(TvType.Anime, listOf(
+                addEpisodes(DubStatus.Subbed, listOf(
                     newEpisode(url) {
                         this.name = "Episódio $episode"
                         this.episode = episode
@@ -125,7 +125,7 @@ class Anroll : MainAPI() {
             return newAnimeLoadResponse(title, url, TvType.Anime) {
                 this.posterUrl = poster
                 this.plot = plot
-                addEpisodes(TvType.Anime, episodes)
+                addEpisodes(DubStatus.Subbed, episodes)
             }
         }
     }
@@ -141,7 +141,7 @@ class Anroll : MainAPI() {
         val videoSource = document.selectFirst("video source")?.attr("src")
         if (videoSource != null) {
             callback.invoke(
-                newExtractorLink(
+                ExtractorLink(
                     name,
                     name,
                     fixUrl(videoSource),
@@ -154,7 +154,7 @@ class Anroll : MainAPI() {
 
         val iframeSrc = document.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
         if (iframeSrc != null) {
-            loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
+            app.loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
             return true
         }
 
