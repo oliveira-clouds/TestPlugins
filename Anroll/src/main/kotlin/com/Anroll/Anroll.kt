@@ -129,7 +129,7 @@ class Anroll : MainAPI() {
     }
 
     override suspend fun loadLinks(
-         String,
+         String,  
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -140,13 +140,13 @@ class Anroll : MainAPI() {
         if (videoSource != null) {
             callback.invoke(
                 newExtractorLink(
-                    name,                    // sourceName
-                    name,                    // name
-                    fixUrl(videoSource),     // url
-                    "$mainUrl/",             // referer
-                    Qualities.P1080.value,   // quality
-                    false,                   // isM3u8
-                    mapOf("Referer" to "$mainUrl/")  // headers
+                    name,
+                    name,
+                    fixUrl(videoSource),
+                    "$mainUrl/",
+                    Qualities.P1080.value,
+                    false,
+                    mapOf("Referer" to "$mainUrl/")
                 )
             )
             return true
