@@ -32,7 +32,7 @@ class Anroll : MainAPI() {
                 }
             }
             "adicionados" -> {
-                document.select("ul.ctmcxR li.movielistitem").forEach { element ->
+                document.select("ul.ctmcR li.movielistitem").forEach { element ->
                     parseAdicionadoCard(element)?.let { items.add(it) }
                 }
             }
@@ -73,7 +73,7 @@ class Anroll : MainAPI() {
         val searchUrl = "$mainUrl/?search=$query"
         val document = app.get(searchUrl).document
 
-        return document.select("ul.UVrQY li.release-item, ul.ctmcxR li.movielistitem").mapNotNull { element ->
+        return document.select("ul.UVrQY li.release-item, ul.ctmcR li.movielistitem").mapNotNull { element ->
             val link = element.selectFirst("a[href]") ?: return@mapNotNull null
             val href = fixUrl(link.attr("href"))
             val title = element.selectFirst("h1")?.text()?.trim() ?: return@mapNotNull null
@@ -100,14 +100,15 @@ class Anroll : MainAPI() {
             val episodeText = document.selectFirst("h2#current_ep b")?.text()
             val episode = episodeText?.toIntOrNull() ?: 1
 
-            return newAnimeLoadResponse(title, url, TvType.Anime, listOf(
-                newEpisode(url) {
-                    this.name = "Episódio $episode"
-                    this.episode = episode
-                }
-            )) {
+            return newAnimeLoadResponse(title, url, TvType.Anime) {
                 this.posterUrl = poster
                 this.plot = plot
+                addEpisodes(TvType.Anime, listOf(
+                    newEpisode(url) {
+                        this.name = "Episódio $episode"
+                        this.episode = episode
+                    }
+                ))
             }
         } else {
             val episodes = document.select("div.epcontrol a").mapIndexed { index, epElement ->
@@ -121,9 +122,10 @@ class Anroll : MainAPI() {
                 }
             }
 
-            return newAnimeLoadResponse(title, url, TvType.Anime, episodes) {
+            return newAnimeLoadResponse(title, url, TvType.Anime) {
                 this.posterUrl = poster
                 this.plot = plot
+                addEpisodes(TvType.Anime, episodes)
             }
         }
     }
@@ -143,11 +145,9 @@ class Anroll : MainAPI() {
                     name,
                     name,
                     fixUrl(videoSource),
+                    "$mainUrl/",
                     ExtractorLinkType.M3U8
-                ) {
-                    this.referer = "$mainUrl/"
-                    this.quality = Qualities.P1080.value
-                }
+                )
             )
             return true
         }
