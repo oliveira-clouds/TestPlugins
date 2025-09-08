@@ -129,7 +129,7 @@ class Anroll : MainAPI() {
     }
 
     override suspend fun loadLinks(
-         String,  
+        data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
