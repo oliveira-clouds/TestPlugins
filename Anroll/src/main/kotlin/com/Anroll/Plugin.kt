@@ -1,11 +1,10 @@
 package com.Anroll
-
+import com.lagradost.cloudstream3.plugins.BasePlugin
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
-import com.lagradost.cloudstream3.plugins.Plugin
 
 @CloudstreamPlugin
-class AnrollPlugin : Plugin() {
-    override fun load(context: android.content.Context) {
+class AnrollPlugin : BasePlugin() {
+    override fun load() {
         registerMainAPI(Anroll())
     }
 }
