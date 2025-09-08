@@ -5,7 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 import java.util.*
 
-class AnimeFHD : MainAPI() {
+class Anroll : MainAPI() {
     override var mainUrl = "https://www.anroll.net"
     override var name = "Anroll"
     override val hasMainPage = true
