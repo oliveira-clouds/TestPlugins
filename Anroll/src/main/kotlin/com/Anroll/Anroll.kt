@@ -145,43 +145,19 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    val episodeDocument = app.get(data).document
-    val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
-    
-    var animeSlug: String? = null
-    var episodeNumber: String? = null
 
-    try {
-        if (scriptTag != null) {
-            val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
-            val jsonObject = JSONObject(scriptContent)
-            
-            val props = jsonObject.getJSONObject("props")
-            val pageProps = props.getJSONObject("pageProps")
-            val episodio = pageProps.getJSONObject("episodio")
-            val animeData = episodio.getJSONObject("anime")
-            
-            animeSlug = animeData.getString("slug_serie")
-            episodeNumber = episodio.getString("n_episodio")
-        }
-    } catch (e: Exception) {
-        // Se houver um erro no parsing do JSON, retornamos false
-        return false
-    }
+    val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/game-centershoujo-to-ibunka-kouryuu/009.mp4/media-1/stream.m3u8"
     
-    if (animeSlug != null && episodeNumber != null) {
-        val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
-        
-        callback.invoke(
-            newExtractorLink(
-                "Anroll",
-                "Anroll",
-                constructedUrl,
-                ExtractorLinkType.M3U8 // Argumento corrigido
-            )
+    // Injetar o link no player do Cloudstream
+    callback.invoke(
+        newExtractorLink(
+            "Anroll",
+            "Anroll",
+            constructedUrl,
+            ExtractorLinkType.M3U8
         )
-        return true
-    }
-    return false
+    )
+    
+    return true
 }
 }
