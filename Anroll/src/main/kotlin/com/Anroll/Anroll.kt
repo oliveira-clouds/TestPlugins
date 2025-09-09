@@ -20,8 +20,7 @@ class Anroll : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime)
 
-    // A função getMainPage agora cuida de ambas as listas
-    override suspend fun getMainPage(page: Int, name: String): HomePageResponse {
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
         val homePageList = mutableListOf<HomePageList>()
         
@@ -33,7 +32,6 @@ class Anroll : MainAPI() {
                 val jsonObject = JSONObject(scriptContent)
                 val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
                 
-                // Extrai a lista de Últimos Lançamentos
                 val releases = pageProps?.optJSONObject("releases")?.optJSONArray("recent_episodes")
                 val latestEpisodes = releases?.let {
                     (0 until it.length()).mapNotNull { i ->
@@ -52,7 +50,6 @@ class Anroll : MainAPI() {
                 } ?: emptyList()
                 homePageList.add(HomePageList("Últimos Lançamentos", latestEpisodes))
                 
-                // Extrai a lista de Últimos Animes Adicionados
                 val animes = pageProps?.optJSONObject("releases")?.optJSONArray("animes")
                 val latestAnimes = animes?.let {
                     (0 until it.length()).mapNotNull { i ->
@@ -82,7 +79,7 @@ class Anroll : MainAPI() {
         val searchUrl = "$mainUrl/buscar?s=$query"
         val document = app.get(searchUrl).document
         
-        val searchResults = document.select("div.list-anime-items div.item").mapNotNull { element ->
+        return document.select("div.list-anime-items div.item").mapNotNull { element ->
             val title = element.selectFirst("div.title > a")?.text()
             val url = element.selectFirst("a")?.attr("href")
             val poster = element.selectFirst("div.img > img")?.attr("src")
@@ -95,7 +92,6 @@ class Anroll : MainAPI() {
                 null
             }
         }
-        return searchResults
     }
 
     override suspend fun load(url: String): LoadResponse? {
