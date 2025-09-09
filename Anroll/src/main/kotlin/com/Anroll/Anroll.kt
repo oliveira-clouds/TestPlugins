@@ -160,38 +160,16 @@ override suspend fun loadLinks(
     val episodeDocument = app.get(data).document
     
     val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
+        ?: return false
     
-    var animeSlug: String? = null
-    var episodeNumber: String? = null
-
-    if (scriptTag != null) {
-        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
-        try {
-            val jsonObject = JSONObject(scriptContent)
-            val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
-            
-            
-            val episodioData = pageProps?.optJSONObject("episodio")
-            if (episodioData != null) {
-                animeSlug = episodioData.optJSONObject("anime")?.optString("slug_serie")
-                episodeNumber = episodioData.optString("n_episodio")
-            }
-            
-        
-            if (animeSlug == null || episodeNumber == null) {
-                val episodeData = pageProps?.optJSONObject("data")
-                if (episodeData != null) {
-                    animeSlug = episodeData.optJSONObject("anime")?.optString("slug_serie")
-                    episodeNumber = episodeData.optString("n_episodio")
-                }
-            }
-            
-        } catch (e: Exception) {
-            return false
-        }
-    } else {
-        return false
-    }
+    val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+    val jsonObject = JSONObject(scriptContent)
+    val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+    
+    val episodeData = pageProps?.optJSONObject("episodio")
+    
+    val animeSlug = episodeData?.optJSONObject("anime")?.optString("slug_serie")
+    val episodeNumber = episodeData?.optString("n_episodio")
     
     if (animeSlug != null && episodeNumber != null) {
         val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
@@ -208,6 +186,7 @@ override suspend fun loadLinks(
         )
         return true
     }
+    
     return false
 }
 }
