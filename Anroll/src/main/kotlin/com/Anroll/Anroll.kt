@@ -138,7 +138,7 @@ class Anroll : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
+   override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
@@ -159,30 +159,26 @@ class Anroll : MainAPI() {
         val playerUrlFromScript = episodio?.get("video_url") as? String
 
         if (playerUrlFromScript != null) {
-            // Passo 2: Acessar a página do player e encontrar a URL do iframe
+            // Passo 2: Acessar a página do player e encontrar a tag <video>
             val playerDocument = app.get(fixUrl(playerUrlFromScript)).document
-            val iframeSrc = playerDocument.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
-
-            if (iframeSrc != null) {
-                // Passo 3: Acessar o iframe e extrair o link do video
-                val iframeDocument = app.get(iframeSrc).document
-                val sourceTag = iframeDocument.selectFirst("video source[type=\"application/x-mpegurl\"]")
-                
-                if (sourceTag != null) {
-                    val videoUrl = sourceTag.attr("src")
-                    if (videoUrl.isNotBlank()) {
-                        callback.invoke(
-                            newExtractorLink(
-                                "Anroll",
-                                "Anroll",
-                                fixUrl(videoUrl),
-                                ExtractorLinkType.M3U8
-                            ) {
-                                this.referer = iframeSrc // o referer agora é a URL do iframe
-                            }
-                        )
-                        return true
-                    }
+            
+            // Procura o link diretamente na tag <source> do player
+            val sourceTag = playerDocument.selectFirst("video source[type=\"application/x-mpegurl\"]")
+            
+            if (sourceTag != null) {
+                val videoUrl = sourceTag.attr("src")
+                if (videoUrl.isNotBlank()) {
+                    callback.invoke(
+                        newExtractorLink(
+                            "Anroll",
+                            "Anroll",
+                            fixUrl(videoUrl),
+                            ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = playerUrlFromScript // o referer agora é a URL do player
+                        }
+                    )
+                    return true
                 }
             }
         }
