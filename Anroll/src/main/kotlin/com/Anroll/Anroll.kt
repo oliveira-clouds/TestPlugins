@@ -21,64 +21,75 @@ class Anroll : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime)
 
-    override val mainPage = mainPageOf(
-        "lancamentos" to "Últimos Lançamentos",
-        "adicionados" to "Últimos Animes Adicionados"
-    )
-
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+    override suspend fun getMainPage(page: Int, name: String): HomePageResponse? {
         val document = app.get(mainUrl).document
-        val items = mutableListOf<SearchResponse>()
-        
-        when (request.data) {
-            "lancamentos" -> {
-                document.select("ul.UVrQY li.release-item").forEach { element ->
-                    parseLancamentoCard(element)?.let { items.add(it) }
-                }
+        val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+            ?: return null
+
+        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+        val jsonObject = JSONObject(scriptContent)
+        val lists = jsonObject.optJSONObject("props")
+            ?.optJSONObject("pageProps")
+            ?.optJSONObject("lists")
+            ?: return null
+
+        val homePageLists = mutableListOf<HomePageList>()
+
+        val releases = lists.optJSONArray("releases")
+        if (releases != null) {
+            val list = mutableListOf<SearchResponse>()
+            (0 until releases.length()).forEach { i ->
+                val anime = releases.optJSONObject(i)
+                val title = anime?.optString("titulo") ?: ""
+                val posterUrl = anime?.optString("poster")
+                val url = "$mainUrl/a/${anime?.optString("generate_id")}"
+                
+                list.add(
+                    newSearchResponse(title, url, TvType.Anime) {
+                        this.posterUrl = posterUrl
+                    }
+                )
             }
-            "adicionados" -> {
-                document.select("ul.ctmcR li.movielistitem").forEach { element ->
-                    parseAdicionadoCard(element)?.let { items.add(it) }
-                }
+            homePageLists.add(HomePageList("Lançamentos", list))
+        }
+
+        val animes = lists.optJSONArray("animes")
+        if (animes != null) {
+            val list = mutableListOf<SearchResponse>()
+            (0 until animes.length()).forEach { i ->
+                val anime = animes.optJSONObject(i)
+                val title = anime?.optString("titulo") ?: ""
+                val posterUrl = anime?.optString("poster")
+                val url = "$mainUrl/a/${anime?.optString("generate_id")}"
+                
+                list.add(
+                    newSearchResponse(title, url, TvType.Anime) {
+                        this.posterUrl = posterUrl
+                    }
+                )
             }
+            homePageLists.add(HomePageList("Animes em Alta", list))
         }
-        
-        return newHomePageResponse(
-            list = HomePageList(
-                name = request.name,
-                list = items,
-                isHorizontalImages = false
-            ),
-            hasNext = false
-        )
-    }
 
-    private fun parseLancamentoCard(element: Element): SearchResponse? {
-        val link = element.selectFirst("a[href]") ?: return null
-        val href = fixUrl(link.attr("href"))
-        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
-        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
-
-        val episodeText = element.selectFirst("span.episode-badge b")?.text()
-        val episode = episodeText?.toIntOrNull() ?: 1
-
-        val isDub = element.selectFirst("div#labels-column2 div.imwHAL") != null
-
-        return newAnimeSearchResponse(title, href, TvType.Anime) {
-            this.posterUrl = posterUrl
-            this.addDubStatus(isDub, episode)
+        val movies = lists.optJSONArray("movies")
+        if (movies != null) {
+            val list = mutableListOf<SearchResponse>()
+            (0 until movies.length()).forEach { i ->
+                val movie = movies.optJSONObject(i)
+                val title = movie?.optString("nome_filme") ?: ""
+                val posterUrl = movie?.optString("capa_filme")
+                val url = "$mainUrl/a/${movie?.optString("generate_id")}"
+                
+                list.add(
+                    newSearchResponse(title, url, TvType.Movie) {
+                        this.posterUrl = posterUrl
+                    }
+                )
+            }
+            homePageLists.add(HomePageList("Filmes", list))
         }
-    }
 
-    private fun parseAdicionadoCard(element: Element): SearchResponse? {
-        val link = element.selectFirst("a[href]") ?: return null
-        val href = fixUrl(link.attr("href"))
-        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
-        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
-
-        return newAnimeSearchResponse(title, href, TvType.Anime) {
-            this.posterUrl = posterUrl
-        }
+        return HomePageResponse(homePageLists)
     }
     
      override suspend fun search(query: String): List<SearchResponse> {
