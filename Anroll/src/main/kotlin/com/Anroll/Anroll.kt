@@ -9,6 +9,8 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import java.util.*
 import org.json.JSONObject
 import org.jsoup.Jsoup
+import java.util.regex.Pattern
+
 
 
 class Anroll : MainAPI() {
@@ -147,18 +149,19 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    val episodeDocument = app.get(data).document
+    val episodePageContent = app.get(data).text
     
-    // A seleção correta da tag script
-    val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__[type='application/json']")
+    // Expressão regular para encontrar o JSON dentro da tag script
+    val jsonPattern = "<script id=\"__NEXT_DATA__\".*?>(.*?)</script>"
+    val matcher = Pattern.compile(jsonPattern, Pattern.DOTALL).matcher(episodePageContent)
     
     var animeSlug: String? = null
     var episodeNumber: String? = null
 
-    if (scriptTag != null) {
-        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+    if (matcher.find()) {
+        val jsonString = matcher.group(1)
         try {
-            val jsonObject = JSONObject(scriptContent)
+            val jsonObject = JSONObject(jsonString)
             
             val props = jsonObject.optJSONObject("props")
             val pageProps = props?.optJSONObject("pageProps")
