@@ -110,48 +110,47 @@ class Anroll : MainAPI() {
             }
         }
     }
-    override suspend fun load(url: String): LoadResponse? {
+     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
+        
+        val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+            ?: return null
 
-        val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
-        val title = titleElement.text().trim()
+        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+        val jsonObject = JSONObject(scriptContent)
+        val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+        val animeData = pageProps?.optJSONObject("data")
+            ?: pageProps?.optJSONObject("anime")
 
-        val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
-        val plot = document.selectFirst("div.sinopse")?.text()
+        val title = animeData?.optString("titulo") ?: return null
+        val poster = animeData.optString("poster")
+        val plot = animeData.optString("sinopse")
 
-        val isEpisodePage = document.selectFirst("div#epinfo h2#current_ep") != null
+        val episodes = mutableListOf<Episode>()
 
-        if (isEpisodePage) {
-            val episodeText = document.selectFirst("h2#current_ep b")?.text()
-            val episode = episodeText?.toIntOrNull() ?: 1
-
-            return newAnimeLoadResponse(title, url, TvType.Anime) {
-                this.posterUrl = poster
-                this.plot = plot
-                addEpisodes(DubStatus.Subbed, listOf(
-                    newEpisode(url) {
-                        this.name = "Episódio $episode"
-                        this.episode = episode
-                    }
-                ))
-            }
-        } else {
-            val episodes = document.select("div.epcontrol a").mapIndexed { index, epElement ->
-                val epUrl = epElement.attr("href").let { fixUrl(it) }
-                val epName = epElement.text().trim()
-                val epNum = index + 1
-
-                newEpisode(epUrl) {
-                    this.name = epName
-                    this.episode = epNum
+        val episodeList = animeData.optJSONArray("episodes")
+        episodeList?.let {
+            (0 until it.length()).mapNotNull { i ->
+                val ep = it.getJSONObject(i)
+                val epTitle = ep.optString("titulo_episodio")
+                val epNumber = ep.optInt("n_episodio", 0)
+                val epUrl = ep.optString("link")
+                
+                if (epUrl.isNotEmpty() && epNumber != 0) {
+                    episodes.add(
+                        newEpisode(epUrl) {
+                            name = epTitle
+                            episode = epNumber
+                        }
+                    )
                 }
             }
-
-            return newAnimeLoadResponse(title, url, TvType.Anime) {
-                this.posterUrl = poster
-                this.plot = plot
-                addEpisodes(DubStatus.Subbed, episodes)
-            }
+        }
+        
+        return newAnimeLoadResponse(title, url, TvType.Anime) {
+            this.posterUrl = poster
+            this.plot = plot
+            addEpisodes(DubStatus.Subbed, episodes.reversed())
         }
     }
 
