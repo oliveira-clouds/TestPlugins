@@ -26,7 +26,7 @@ class Anroll : MainAPI() {
     "adicionados" to "Animes em Alta",
     "filmes" to "Filmes"
 )
-override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+ override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return newHomePageResponse(request.name, emptyList())
@@ -53,7 +53,7 @@ override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageR
                 val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme")
                 val url = "$mainUrl/a/${entry?.optString("generate_id")}"
                 val type = if (request.data == "filmes") TvType.Movie else TvType.Anime
-
+                
                 items.add(
                     newSearchResponse(title, url, type) {
                         this.posterUrl = posterUrl
@@ -61,7 +61,7 @@ override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageR
                 )
             }
         }
-
+        
         return newHomePageResponse(
             list = HomePageList(
                 name = request.name,
