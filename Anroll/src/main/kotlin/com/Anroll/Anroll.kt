@@ -161,13 +161,12 @@ class Anroll : MainAPI() {
 
             if (videoUrl != null) {
                 callback.invoke(
-                    ExtractorLink(
-                        source = "Anroll",
-                        name = "Anroll",
-                        url = fixUrl(videoUrl),
-                        referer = mainUrl,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = true
+                    newExtractorLink(
+                        "Anroll",
+                        "Anroll",
+                        fixUrl(videoUrl),
+                        mainUrl,
+                        Qualities.Unknown.value
                     )
                 )
                 return true
@@ -185,13 +184,12 @@ class Anroll : MainAPI() {
                     if (fileMatch != null) {
                         val videoUrl = fileMatch.groupValues[1]
                         callback.invoke(
-                            ExtractorLink(
-                                source = "Anroll",
-                                name = "Anroll",
-                                url = fixUrl(videoUrl),
-                                referer = iframeSrc,
-                                quality = Qualities.Unknown.value,
-                                isM3u8 = videoUrl.contains(".m3u8")
+                            newExtractorLink(
+                                "Anroll",
+                                "Anroll",
+                                fixUrl(videoUrl),
+                                iframeSrc,
+                                Qualities.Unknown.value
                             )
                         )
                         return true
