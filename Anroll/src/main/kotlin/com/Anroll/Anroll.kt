@@ -144,43 +144,49 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    
+    // 1. Obter a página principal do episódio
     val episodeDocument = app.get(data).document
     val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
     
     val videoUrl: String?
+    var animeSlug: String? = null
+    var episodeNumber: String? = null
 
-    if (scriptTag != null) {
-        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
-        val mapper = ObjectMapper()
-        val jsonObject = mapper.readValue<Map<String, Any>>(scriptContent)
-        
-        val props = jsonObject["props"] as? Map<*, *>
-        val pageProps = props?.get("pageProps") as? Map<*, *>
-        val episodio = pageProps?.get("episodio") as? Map<*, *>
-        
-        val animeData = episodio?.get("anime") as? Map<*, *>
-        val animeSlug = animeData?.get("slug_serie") as? String
-        val episodeNumber = episodio?.get("n_episodio") as? String
-        
-        // 2. Construir a URL do vídeo
-        if (animeSlug != null && episodeNumber != null) {
-            val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
-            videoUrl = constructedUrl
-        } else {
-            return false
+    try {
+        if (scriptTag != null) {
+            val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+            val jsonObject = Klaxon().parse<JsonObject>(scriptContent)
+            
+            val props = jsonObject?.obj("props")
+            val pageProps = props?.obj("pageProps")
+            val episodio = pageProps?.obj("episodio")
+            val animeData = episodio?.obj("anime")
+            
+            animeSlug = animeData?.string("slug_serie")
+            episodeNumber = episodio?.string("n_episodio")
         }
+    } catch (e: Exception) {
+        // Logar o erro para fins de depuração, se necessário
+        // print(e.stackTraceToString())
+        return false
+    }
+    
+   
+    if (animeSlug != null && episodeNumber != null) {
+        val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
+        videoUrl = constructedUrl
     } else {
         return false
     }
     
+
     if (videoUrl != null) {
         callback.invoke(
             newExtractorLink(
                 "Anroll",
                 "Anroll",
                 videoUrl,
-                ExtractorLinkType.M3U8 
+                ExtractorLinkType.M3U8
             )
         )
         return true
