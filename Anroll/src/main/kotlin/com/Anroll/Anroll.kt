@@ -1,8 +1,11 @@
 package com.Anroll
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
+import org.jsoup.parser.Parser
 import java.util.*
 
 class Anroll : MainAPI() {
@@ -10,90 +13,128 @@ class Anroll : MainAPI() {
     override var name = "Anroll"
     override val hasMainPage = true
     override var lang = "pt-br"
-    override val hasDownloadSupport = true
+    override val hasDownloadSupport = false
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime)
 
     override val mainPage = mainPageOf(
-        "?ano=2025" to "2025",
-        "?genero=acao" to "Ação",
-        "?genero=drama" to "Drama",
-        "?genero=militar" to "Militar",
-        "?genero=shounen" to "Shounen",
-        "?genero=terror" to "Terror",
-        "?genero=comedia" to "Comédia",
-        "?genero=vida-escolar" to "Vida Escolar",
-        "?genero=ecchi" to "Ecchi",
-        "?genero=ficcao-cientifica" to "Ficção Científica",
-        "?genero=harem" to "Hárem",
-        "?genero=romance" to "Romance",
-        "?genero=magia" to "Mágia",
-        "?genero=isekai" to "Isekai",
-        "?genero=psicologico" to "Psicológico",
-        "?genero=thriller" to "Thriller",
-        "?genero=slice-of-life" to "Slice-of-life",
-        "?genero=esportes" to "Esportes",
-        "?genero=comedia-romantica" to "Comédia Romântica",
-        "?genero=musical" to "Musical"
+        "lancamentos" to "Últimos Lançamentos",
+        "adicionados" to "Últimos Animes Adicionados"
     )
 
-    override suspend fun getMainPage(
-        page: Int,
-        request: MainPageRequest
-    ): HomePageResponse {
-        val url = "$mainUrl/lista-de-animes/${request.data}"
-        val document = app.get(url).document
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val document = app.get(mainUrl).document
+        val items = mutableListOf<SearchResponse>()
         
-        val animeElements = document.select("div.ultAnisContainerItem")
-        val home = animeElements.mapNotNull { it.toSearchResult() }
+        when (request.data) {
+            "lancamentos" -> {
+                document.select("ul.UVrQY li.release-item").forEach { element ->
+                    parseLancamentoCard(element)?.let { items.add(it) }
+                }
+            }
+            "adicionados" -> {
+                document.select("ul.ctmcR li.movielistitem").forEach { element ->
+                    parseAdicionadoCard(element)?.let { items.add(it) }
+                }
+            }
+        }
         
         return newHomePageResponse(
             list = HomePageList(
                 name = request.name,
-                list = home,
+                list = items,
                 isHorizontalImages = false
             ),
             hasNext = false
         )
     }
 
-    private fun Element.toSearchResult(): SearchResponse? {
-        val title = this.select("div.aniNome").text().trim()
-        val href = fixUrl(this.select("a").attr("href"))
-        val posterUrl = this.select("div.aniImg img").attr("src")
-        
-        if (title.isBlank() || href.isBlank()) {
-            return null
+    private fun parseLancamentoCard(element: Element): SearchResponse? {
+        val link = element.selectFirst("a[href]") ?: return null
+        val href = fixUrl(link.attr("href"))
+        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
+        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
+
+        val episodeText = element.selectFirst("span.episode-badge b")?.text()
+        val episode = episodeText?.toIntOrNull() ?: 1
+
+        val isDub = element.selectFirst("div#labels-column2 div.imwHAL") != null
+
+        return newAnimeSearchResponse(title, href, TvType.Anime) {
+            this.posterUrl = posterUrl
+            this.addDubStatus(isDub, episode)
         }
-        
-        return newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+    }
+
+    private fun parseAdicionadoCard(element: Element): SearchResponse? {
+        val link = element.selectFirst("a[href]") ?: return null
+        val href = fixUrl(link.attr("href"))
+        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
+        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
+
+        return newAnimeSearchResponse(title, href, TvType.Anime) {
             this.posterUrl = posterUrl
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val url = "$mainUrl/?s=$query"
-        val document = app.get(url).document
-        return document.select("div.ultAnisContainerItem").mapNotNull { it.toSearchResult() }
+        val searchUrl = "$mainUrl/?search=$query"
+        val document = app.get(searchUrl).document
+
+        return document.select("ul.UVrQY li.release-item, ul.ctmcR li.movielistitem").mapNotNull { element ->
+            val link = element.selectFirst("a[href]") ?: return@mapNotNull null
+            val href = fixUrl(link.attr("href"))
+            val title = element.selectFirst("h1")?.text()?.trim() ?: return@mapNotNull null
+            val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
+
+            newAnimeSearchResponse(title, href, TvType.Anime) {
+                this.posterUrl = posterUrl
+            }
+        }
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
-        
-        val title = document.selectFirst("div.animeFirstContainer h1, h1.anime-title, h1.title")?.text()?.trim() ?: ""
-        
-        val description = document.selectFirst("div.animeSecondContainer p, .sinopse p, .description p, .plot p")?.text()?.trim()
-        
-        val genres = document.select("div.animeFirstContainer ul.animeGen li a, .genres a, .tags a, ul.animeGen li a").map { it.text().trim() }.toMutableList()
-        
-        val episodes = loadEpisodesFromPage(document, url)
-        
-        val firstEpisodePoster = episodes.firstOrNull()?.posterUrl
-        
-        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-            this.posterUrl = firstEpisodePoster
-            this.plot = description
-            this.tags = genres
+
+        val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
+        val title = titleElement.text().trim()
+
+        val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
+        val plot = document.selectFirst("div.sinopse")?.text()
+
+        val isEpisodePage = document.selectFirst("div#epinfo h2#current_ep") != null
+
+        if (isEpisodePage) {
+            val episodeText = document.selectFirst("h2#current_ep b")?.text()
+            val episode = episodeText?.toIntOrNull() ?: 1
+
+            return newAnimeLoadResponse(title, url, TvType.Anime) {
+                this.posterUrl = poster
+                this.plot = plot
+                addEpisodes(DubStatus.Subbed, listOf(
+                    newEpisode(url) {
+                        this.name = "Episódio $episode"
+                        this.episode = episode
+                    }
+                ))
+            }
+        } else {
+            val episodes = document.select("div.epcontrol a").mapIndexed { index, epElement ->
+                val epUrl = epElement.attr("href").let { fixUrl(it) }
+                val epName = epElement.text().trim()
+                val epNum = index + 1
+
+                newEpisode(epUrl) {
+                    this.name = epName
+                    this.episode = epNum
+                }
+            }
+
+            return newAnimeLoadResponse(title, url, TvType.Anime) {
+                this.posterUrl = poster
+                this.plot = plot
+                addEpisodes(DubStatus.Subbed, episodes)
+            }
         }
     }
 
@@ -105,202 +146,39 @@ class Anroll : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         
-        val episodeInfo = document.selectFirst("div.informacoes_ep")
-        val episodeTitle = episodeInfo?.select("div.info")?.find { it.text().contains("Episódio:") }?.text()?.trim()
-        val episodeDescription = episodeInfo?.select("div.info")?.find { it.text().contains("Descrição:") }?.text()?.trim()
-        val audioType = episodeInfo?.select("div.info")?.find { it.text().contains("Tipo de Áudio:") }?.text()?.trim()
-        
-        val truncatedDescription = if (episodeDescription != null) {
-            val sentences = episodeDescription.split(".")
-            if (sentences.size >= 3) {
-                sentences.take(3).joinToString(".") + "."
-            } else {
-                episodeDescription
-            }
-        } else null
-        
-        val playerBox = document.selectFirst("div.playerBox iframe")
-        if (playerBox == null) {
-            return false
-        }
-        
-        val embedUrl = playerBox.attr("src")
-        if (embedUrl.isBlank()) {
-            return false
-        }
-        
-        val embedDocument = app.get(embedUrl).document
-        
-        val scripts = embedDocument.select("script")
-        var videoUrl = ""
-        var quality = ""
-        var episodeImage = ""
-        
-        for (script in scripts) {
-            val scriptContent = script.html()
-            if (scriptContent.contains("sources") && scriptContent.contains("file")) {
-                val fileMatch = Regex("file:\\s*'([^']+)'").find(scriptContent)
-                val labelMatch = Regex("label:\\s*\"([^\"]+)\"").find(scriptContent)
-                val imageMatch = Regex("image:\\s*'([^']+)'").find(scriptContent)
-                
-                if (fileMatch != null) {
-                    videoUrl = fileMatch.groupValues[1]
-                }
-                if (labelMatch != null) {
-                    quality = labelMatch.groupValues[1]
-                }
-                if (imageMatch != null) {
-                    episodeImage = imageMatch.groupValues[1]
-                }
-                break
+        // Novo seletor e lógica para extrair o link do vídeo do script JSON
+        val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+        if (scriptTag != null) {
+            val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+            val jsonObject = parseJson<Any>(scriptContent) as? Map<*, *>
+            val videoUrl = jsonObject?.get("props")
+                ?.as-link<Map<*, *>>()?.get("pageProps")
+                ?.as-link<Map<*, *>>()?.get("episodio")
+                ?.as-link<Map<*, *>>()?.get("video_url")
+                ?.as-link<String>()
+
+            if (videoUrl != null) {
+                callback.invoke(
+                    ExtractorLink(
+                        source = name,
+                        name = "Anroll",
+                        url = fixUrl(videoUrl),
+                        referer = mainUrl,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = true
+                    )
+                )
+                return true
             }
         }
-        
-        if (videoUrl.isBlank()) {
-            return false
+
+        // Lógica para iframes (se eles forem adicionados no futuro)
+        val iframeSrc = document.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
+        if (iframeSrc != null) {
+            app.loadExtractor(iframeSrc, mainUrl, subtitleCallback, callback)
+            return true
         }
-        
-        val sourceName = buildString {
-            append("Anroll")
-            if (quality.isNotEmpty()) append(" $quality")
-            if (audioType != null) {
-                val cleanAudio = audioType.replace("Tipo de Áudio:", "").trim()
-                append(" ($cleanAudio)")
-            }
-            if (episodeTitle != null) {
-                val cleanTitle = episodeTitle.replace("Episódio:", "").trim()
-                append(" - $cleanTitle")
-            }
-        }
-        
-        callback(
-            newExtractorLink(
-                sourceName,
-                sourceName,
-                videoUrl,
-                ExtractorLinkType.M3U8
-            ) {
-                this.referer = mainUrl
-            }
-        )
-        
-        return true
+
+        return false
     }
-    
-    private suspend fun loadEpisodesFromPage(document: org.jsoup.nodes.Document, baseUrl: String): List<Episode> {
-        val episodes = mutableListOf<Episode>()
-        var episodeCounter = 1
-        
-        val episodeSection = document.selectFirst("div.sectionEpiInAnime#aba_epi")
-        if (episodeSection != null) {
-            val episodeLinks = episodeSection.select("a.list-epi")
-            episodeLinks.forEach { link ->
-                val episodeText = link.text().trim()
-                val episodeUrl = fixUrl(link.attr("href"))
-                
-                val episodeMatch = Regex("Episódio\\s*(\\d+)").find(episodeText)
-                if (episodeMatch != null) {
-                    val episodeNumber = episodeMatch.groupValues[1].toIntOrNull()
-                    if (episodeNumber != null) {
-                        val episodePoster = extractEpisodeImage(episodeUrl)
-                        
-                        val episode = newEpisode(episodeUrl) {
-                            this.name = "Episódio $episodeNumber"
-                            this.episode = episodeNumber
-                            this.season = 1
-                            this.posterUrl = episodePoster
-                        }
-                        episodes.add(episode)
-                        episodeCounter++
-                    }
-                }
-            }
-        }
-        
-        val ovaSection = document.selectFirst("div.sectionEpiInAnime#aba_ova")
-        if (ovaSection != null) {
-            val ovaLinks = ovaSection.select("a.list-epi")
-            ovaLinks.forEach { link ->
-                val ovaText = link.text().trim()
-                val ovaUrl = fixUrl(link.attr("href"))
-                
-                val ovaMatch = Regex("Ova\\s*(\\d+)").find(ovaText)
-                if (ovaMatch != null) {
-                    val ovaNumber = ovaMatch.groupValues[1].toIntOrNull()
-                    if (ovaNumber != null) {
-                        val ovaPoster = extractEpisodeImage(ovaUrl)
-                        
-                        val episode = newEpisode(ovaUrl) {
-                            this.name = "OVA $ovaNumber"
-                            this.episode = episodeCounter
-                            this.season = 1
-                            this.posterUrl = ovaPoster
-                        }
-                        episodes.add(episode)
-                        episodeCounter++
-                    }
-                }
-            }
-        }
-        
-        val movieSection = document.selectFirst("div.sectionEpiInAnime#aba_movie")
-        if (movieSection != null) {
-            val movieLinks = movieSection.select("a.list-epi")
-            movieLinks.forEach { link ->
-                val movieText = link.text().trim()
-                val movieUrl = fixUrl(link.attr("href"))
-                
-                val movieMatch = Regex("Filme\\s*(\\d+)").find(movieText)
-                if (movieMatch != null) {
-                    val movieNumber = movieMatch.groupValues[1].toIntOrNull()
-                    if (movieNumber != null) {
-                        val moviePoster = extractEpisodeImage(movieUrl)
-                        
-                        val episode = newEpisode(movieUrl) {
-                            this.name = "Filme $movieNumber"
-                            this.episode = episodeCounter
-                            this.season = 1
-                            this.posterUrl = moviePoster
-                        }
-                        episodes.add(episode)
-                        episodeCounter++
-                    }
-                }
-            }
-        }
-        
-        return episodes.sortedBy { it.episode }
-    }
-    
-    private suspend fun extractEpisodeImage(episodeUrl: String): String? {
-        return try {
-            val document = app.get(episodeUrl).document
-            
-            val playerBox = document.selectFirst("div.playerBox iframe")
-            if (playerBox == null) {
-                return null
-            }
-            
-            val embedUrl = playerBox.attr("src")
-            if (embedUrl.isBlank()) {
-                return null
-            }
-            
-            val embedDocument = app.get(embedUrl).document
-            
-            val scripts = embedDocument.select("script")
-            for (script in scripts) {
-                val scriptContent = script.html()
-                if (scriptContent.contains("image:") && scriptContent.contains("anroll.net")) {
-                    val imageMatch = Regex("image:\\s*'([^']+)'").find(scriptContent)
-                    if (imageMatch != null) {
-                        return imageMatch.groupValues[1]
-                    }
-                }
-            }
-            null
-        } catch (e: Exception) {
-            null
-        }
-    }
-} 
+}
