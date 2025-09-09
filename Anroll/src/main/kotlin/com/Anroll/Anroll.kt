@@ -8,14 +8,15 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import java.util.*
 import org.json.JSONObject
-import java.util.regex.Pattern
+import org.jsoup.Jsoup
+
 
 class Anroll : MainAPI() {
     override var mainUrl = "https://www.anroll.net"
     override var name = "Anroll"
     override val hasMainPage = true
     override var lang = "pt-br"
-    override val hasDownloadSupport = true
+    override val hasDownloadSupport = false
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime)
 
@@ -146,18 +147,18 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    val episodePageContent = app.get(data).text
+    val episodeDocument = app.get(data).document
     
-    val jsonPattern = "window\\.__NEXT_DATA__ = (.*?);</script>"
-    val matcher = Pattern.compile(jsonPattern).matcher(episodePageContent)
+    // A seleção correta da tag script
+    val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__[type='application/json']")
     
     var animeSlug: String? = null
     var episodeNumber: String? = null
 
-    if (matcher.find()) {
-        val jsonString = matcher.group(1)
+    if (scriptTag != null) {
+        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
         try {
-            val jsonObject = JSONObject(jsonString)
+            val jsonObject = JSONObject(scriptContent)
             
             val props = jsonObject.optJSONObject("props")
             val pageProps = props?.optJSONObject("pageProps")
@@ -168,7 +169,6 @@ override suspend fun loadLinks(
             episodeNumber = episodio?.optString("n_episodio")
             
         } catch (e: Exception) {
-            // Logar o erro, se necessário
             return false
         }
     } else {
