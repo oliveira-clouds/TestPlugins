@@ -155,7 +155,10 @@ override suspend fun loadLinks(
             "Anroll",
             constructedUrl,
             ExtractorLinkType.M3U8
-        )
+        ) {
+
+            this.referer = "https://www.anroll.net/"
+        }
     )
     
     return true
