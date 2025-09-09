@@ -144,11 +144,12 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    // 1. Obter a página principal do episódio
+    
     val episodeDocument = app.get(data).document
     val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
     
     val videoUrl: String?
+
     if (scriptTag != null) {
         val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
         val mapper = ObjectMapper()
@@ -162,15 +163,15 @@ override suspend fun loadLinks(
         val animeSlug = animeData?.get("slug_serie") as? String
         val episodeNumber = episodio?.get("n_episodio") as? String
         
-    
+        // 2. Construir a URL do vídeo
         if (animeSlug != null && episodeNumber != null) {
             val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
             videoUrl = constructedUrl
         } else {
-            return false // Falha ao encontrar os dados necessários
+            return false
         }
     } else {
-        return false // Falha ao encontrar o script
+        return false
     }
     
     if (videoUrl != null) {
@@ -179,7 +180,7 @@ override suspend fun loadLinks(
                 "Anroll",
                 "Anroll",
                 videoUrl,
-                mainUrl
+                ExtractorLinkType.M3U8 
             )
         )
         return true
