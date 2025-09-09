@@ -145,16 +145,18 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    val episodeDocument = app.get(data).document
-    val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
+    val episodePageContent = app.get(data).text
+    
+    val jsonPattern = "window\\.__NEXT_DATA__ = (.*?);</script>"
+    val matcher = Pattern.compile(jsonPattern).matcher(episodePageContent)
     
     var animeSlug: String? = null
     var episodeNumber: String? = null
 
-    if (scriptTag != null) {
-        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+    if (matcher.find()) {
+        val jsonString = matcher.group(1)
         try {
-            val jsonObject = JSONObject(scriptContent)
+            val jsonObject = JSONObject(jsonString)
             
             val props = jsonObject.optJSONObject("props")
             val pageProps = props?.optJSONObject("pageProps")
@@ -165,18 +167,15 @@ override suspend fun loadLinks(
             episodeNumber = episodio?.optString("n_episodio")
             
         } catch (e: Exception) {
-            println("Anroll ERROR: Erro ao analisar JSON - ${e.message}")
+            // Logar o erro, se necessário
             return false
         }
     } else {
-        println("Anroll ERROR: Script __NEXT_DATA__ não encontrado.")
         return false
     }
     
     if (animeSlug != null && episodeNumber != null) {
         val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
-        
-        println("Anroll INFO: URL construída com sucesso: $constructedUrl")
         
         callback.invoke(
             newExtractorLink(
@@ -190,7 +189,6 @@ override suspend fun loadLinks(
         )
         return true
     }
-    println("Anroll ERROR: Dados necessários (animeSlug ou episodeNumber) não encontrados.")
     return false
 }
 }
