@@ -55,9 +55,7 @@ class Anroll : MainAPI() {
                 val type = if (request.data == "filmes") TvType.Movie else TvType.Anime
                 
                 items.add(
-                    newSearchResponse(title, url, type) {
-                        this.posterUrl = posterUrl
-                    }
+                    newSearchResponse(title, url, type, posterUrl)
                 )
             }
         }
