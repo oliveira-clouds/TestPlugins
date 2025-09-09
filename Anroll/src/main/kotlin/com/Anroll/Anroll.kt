@@ -166,6 +166,7 @@ class Anroll : MainAPI() {
                         "Anroll",
                         fixUrl(videoUrl),
                         mainUrl,
+                        Qualities.Unknown.value
                     )
                 )
                 return true
