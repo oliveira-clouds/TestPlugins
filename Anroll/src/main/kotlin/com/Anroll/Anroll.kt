@@ -53,17 +53,15 @@ override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageR
                 val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme")
                 val url = "$mainUrl/a/${entry?.optString("generate_id")}"
                 val type = if (request.data == "filmes") TvType.Movie else TvType.Anime
-                
-                items.add(object : SearchResponse {
-                    override val name = title
-                    override val url = url
-                    override val type = type
-                    override val apiName = name
-                    override val posterUrl = posterUrl
-                })
+
+                items.add(
+                    newSearchResponse(title, url, type) {
+                        this.posterUrl = posterUrl
+                    }
+                )
             }
         }
-        
+
         return newHomePageResponse(
             list = HomePageList(
                 name = request.name,
