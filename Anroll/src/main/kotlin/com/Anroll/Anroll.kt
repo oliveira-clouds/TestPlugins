@@ -168,11 +168,10 @@ override suspend fun loadLinks(
     
     val episodeData = pageProps?.optJSONObject("episodio")
     
-    val animeSlug = episodeData?.optJSONObject("anime")?.optString("slug_serie")
-    val episodeNumber = episodeData?.optString("n_episodio")
+    val videoFilePath = episodeData?.optString("video_file")
     
-    if (animeSlug != null && episodeNumber != null) {
-        val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
+    if (videoFilePath != null && videoFilePath.isNotEmpty()) {
+        val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net$videoFilePath"
         
         callback.invoke(
             newExtractorLink(
