@@ -165,9 +165,10 @@ class Anroll : MainAPI() {
                         "Anroll",
                         "Anroll",
                         fixUrl(videoUrl),
-                        mainUrl,
-                        Qualities.Unknown.value
-                    )
+                        ExtractorLinkType.M3U8
+                    ) {
+                        this.referer = mainUrl
+                    }
                 )
                 return true
             }
@@ -188,9 +189,10 @@ class Anroll : MainAPI() {
                                 "Anroll",
                                 "Anroll",
                                 fixUrl(videoUrl),
-                                iframeSrc,
-                                Qualities.Unknown.value
-                            )
+                                ExtractorLinkType.M3U8
+                            ) {
+                                this.referer = iframeSrc
+                            }
                         )
                         return true
                     }
