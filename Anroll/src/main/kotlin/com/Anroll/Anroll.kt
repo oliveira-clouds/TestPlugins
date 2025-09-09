@@ -27,76 +27,76 @@ class Anroll : MainAPI() {
         "adicionados" to "Últimos Animes Adicionados"
     )
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = app.get(mainUrl).document
-        val items = mutableListOf<SearchResponse>()
-        
-        when (request.data) {
-            "lancamentos" -> {
-                document.select("ul.UVrQY li.release-item").forEach { element ->
-                    parseLancamentoCard(element)?.let { items.add(it) }
+    override suspend fun getMainPage(page: Int, name: String): HomePageResponse {
+    val document = app.get(getBaseUrl()).document
+    val homePageList = mutableListOf<HomePageList>()
+    
+    val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+    
+    if (scriptTag != null) {
+        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+        try {
+            val jsonObject = JSONObject(scriptContent)
+            val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+            
+            // Extrai a lista de Últimos Lançamentos
+            val releases = pageProps?.optJSONObject("releases")?.optJSONArray("recent_episodes")
+            val latestEpisodes = releases?.let {
+                (0 until it.length()).mapNotNull { i ->
+                    val item = it.getJSONObject(i)
+                    val title = item.optString("titulo_episodio")
+                    val url = item.optString("link")
+                    val poster = item.optString("poster")
+                    if (title.isNotEmpty() && url.isNotEmpty() && poster.isNotEmpty()) {
+                        newAnimeSearchResponse(title, url, poster)
+                    } else {
+                        null
+                    }
                 }
-            }
-            "adicionados" -> {
-                document.select("ul.ctmcR li.movielistitem").forEach { element ->
-                    parseAdicionadoCard(element)?.let { items.add(it) }
+            } ?: emptyList()
+            homePageList.add(HomePageList("Últimos Lançamentos", latestEpisodes))
+            
+            // Extrai a lista de Últimos Animes Adicionados
+            val animes = pageProps?.optJSONObject("releases")?.optJSONArray("animes")
+            val latestAnimes = animes?.let {
+                (0 until it.length()).mapNotNull { i ->
+                    val item = it.getJSONObject(i)
+                    val title = item.optString("titulo")
+                    val url = item.optString("link")
+                    val poster = item.optString("poster")
+                    if (title.isNotEmpty() && url.isNotEmpty() && poster.isNotEmpty()) {
+                        newAnimeSearchResponse(title, url, poster)
+                    } else {
+                        null
+                    }
                 }
-            }
+            } ?: emptyList()
+            homePageList.add(HomePageList("Últimos Animes Adicionados", latestAnimes))
+
+        } catch (e: Exception) {
+            // Em caso de erro, retorna uma lista vazia
         }
+    }
+    return newHomePageResponse(homePageList)
+}
+
+   override suspend fun search(query: String): List<SearchResponse> {
+    val searchUrl = "$mainUrl/buscar?s=$query"
+    val document = app.get(searchUrl).document
+    
+    val searchResults = document.select("div.list-anime-items div.item").mapNotNull { element ->
+        val title = element.selectFirst("div.title > a")?.text()
+        val url = element.selectFirst("a")?.attr("href")
+        val poster = element.selectFirst("div.img > img")?.attr("src")
         
-        return newHomePageResponse(
-            list = HomePageList(
-                name = request.name,
-                list = items,
-                isHorizontalImages = false
-            ),
-            hasNext = false
-        )
-    }
-
-    private fun parseLancamentoCard(element: Element): SearchResponse? {
-        val link = element.selectFirst("a[href]") ?: return null
-        val href = fixUrl(link.attr("href"))
-        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
-        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
-
-        val episodeText = element.selectFirst("span.episode-badge b")?.text()
-        val episode = episodeText?.toIntOrNull() ?: 1
-
-        val isDub = element.selectFirst("div#labels-column2 div.imwHAL") != null
-
-        return newAnimeSearchResponse(title, href, TvType.Anime) {
-            this.posterUrl = posterUrl
-            this.addDubStatus(isDub, episode)
+        if (title != null && url != null && poster != null) {
+            newAnimeSearchResponse(title, url, poster)
+        } else {
+            null
         }
     }
-
-    private fun parseAdicionadoCard(element: Element): SearchResponse? {
-        val link = element.selectFirst("a[href]") ?: return null
-        val href = fixUrl(link.attr("href"))
-        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
-        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
-
-        return newAnimeSearchResponse(title, href, TvType.Anime) {
-            this.posterUrl = posterUrl
-        }
-    }
-
-    override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?search=$query"
-        val document = app.get(searchUrl).document
-
-        return document.select("ul.UVrQY li.release-item, ul.ctmcR li.movielistitem").mapNotNull { element ->
-            val link = element.selectFirst("a[href]") ?: return@mapNotNull null
-            val href = fixUrl(link.attr("href"))
-            val title = element.selectFirst("h1")?.text()?.trim() ?: return@mapNotNull null
-            val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
-
-            newAnimeSearchResponse(title, href, TvType.Anime) {
-                this.posterUrl = posterUrl
-            }
-        }
-    }
+    return searchResults
+}
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
