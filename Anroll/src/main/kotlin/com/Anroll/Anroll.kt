@@ -156,7 +156,6 @@ override suspend fun loadLinks(
         try {
             val jsonObject = JSONObject(scriptContent)
             
-            // Usando métodos "opt" para evitar erros se as chaves não existirem
             val props = jsonObject.optJSONObject("props")
             val pageProps = props?.optJSONObject("pageProps")
             val episodio = pageProps?.optJSONObject("episodio")
@@ -166,15 +165,19 @@ override suspend fun loadLinks(
             episodeNumber = episodio?.optString("n_episodio")
             
         } catch (e: Exception) {
-            // Em caso de erro na análise, a função retorna false
+            logError("Erro ao analisar JSON: ${e.message}")
             return false
         }
     } else {
+        logError("Script __NEXT_DATA__ não encontrado.")
         return false
     }
     
     if (animeSlug != null && episodeNumber != null) {
         val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
+        
+        // Loga a URL que será usada antes de tentar abrir
+        logInfo("URL construída com sucesso: $constructedUrl")
         
         callback.invoke(
             newExtractorLink(
@@ -183,12 +186,13 @@ override suspend fun loadLinks(
                 constructedUrl,
                 ExtractorLinkType.M3U8
             ) {
-                // Adicionando o cabeçalho Referer com a URL do episódio
+                // Adicionando o cabeçalho Referer
                 this.referer = data
             }
         )
         return true
     }
+    logError("Dados necessários (animeSlug ou episodeNumber) não encontrados.")
     return false
 }
 }
