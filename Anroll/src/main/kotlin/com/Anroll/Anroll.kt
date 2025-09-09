@@ -149,27 +149,34 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    val episodePageContent = app.get(data).text
+    val episodeDocument = app.get(data).document
     
-    // Expressão regular para encontrar o JSON dentro da tag script
-    val jsonPattern = "<script id=\"__NEXT_DATA__\".*?>(.*?)</script>"
-    val matcher = Pattern.compile(jsonPattern, Pattern.DOTALL).matcher(episodePageContent)
+    val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
     
     var animeSlug: String? = null
     var episodeNumber: String? = null
 
-    if (matcher.find()) {
-        val jsonString = matcher.group(1)
+    if (scriptTag != null) {
+        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
         try {
-            val jsonObject = JSONObject(jsonString)
+            val jsonObject = JSONObject(scriptContent)
+            val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
             
-            val props = jsonObject.optJSONObject("props")
-            val pageProps = props?.optJSONObject("pageProps")
-            val episodio = pageProps?.optJSONObject("episodio")
-            val animeData = episodio?.optJSONObject("anime")
             
-            animeSlug = animeData?.optString("slug_serie")
-            episodeNumber = episodio?.optString("n_episodio")
+            val episodioData = pageProps?.optJSONObject("episodio")
+            if (episodioData != null) {
+                animeSlug = episodioData.optJSONObject("anime")?.optString("slug_serie")
+                episodeNumber = episodioData.optString("n_episodio")
+            }
+            
+        
+            if (animeSlug == null || episodeNumber == null) {
+                val episodeData = pageProps?.optJSONObject("data")
+                if (episodeData != null) {
+                    animeSlug = episodeData.optJSONObject("anime")?.optString("slug_serie")
+                    episodeNumber = episodeData.optString("n_episodio")
+                }
+            }
             
         } catch (e: Exception) {
             return false
