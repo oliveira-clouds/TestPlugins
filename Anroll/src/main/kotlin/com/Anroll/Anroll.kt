@@ -161,12 +161,13 @@ class Anroll : MainAPI() {
 
             if (videoUrl != null) {
                 callback.invoke(
-                    newExtractorLink(
-                        "Anroll",
-                        "Anroll",
-                        fixUrl(videoUrl),
-                        mainUrl,
-                        Qualities.Unknown.value
+                    ExtractorLink(
+                        source = "Anroll",
+                        name = "Anroll",
+                        url = fixUrl(videoUrl),
+                        referer = mainUrl,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = true
                     )
                 )
                 return true
@@ -175,8 +176,28 @@ class Anroll : MainAPI() {
 
         val iframeSrc = document.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
         if (iframeSrc != null) {
-            app.loadExtractor(iframeSrc, mainUrl, subtitleCallback, callback)
-            return true
+            val iframeDocument = app.get(iframeSrc).document
+            val scripts = iframeDocument.select("script")
+            for (script in scripts) {
+                val scriptContent = script.html()
+                if (scriptContent.contains("sources") && scriptContent.contains("file")) {
+                    val fileMatch = Regex("file:\\s*\"([^\"]+)\"").find(scriptContent)
+                    if (fileMatch != null) {
+                        val videoUrl = fileMatch.groupValues[1]
+                        callback.invoke(
+                            ExtractorLink(
+                                source = "Anroll",
+                                name = "Anroll",
+                                url = fixUrl(videoUrl),
+                                referer = iframeSrc,
+                                quality = Qualities.Unknown.value,
+                                isM3u8 = videoUrl.contains(".m3u8")
+                            )
+                        )
+                        return true
+                    }
+                }
+            }
         }
 
         return false
