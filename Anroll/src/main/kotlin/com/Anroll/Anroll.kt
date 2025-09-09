@@ -165,19 +165,18 @@ override suspend fun loadLinks(
             episodeNumber = episodio?.optString("n_episodio")
             
         } catch (e: Exception) {
-            logError("Erro ao analisar JSON: ${e.message}")
+            println("Anroll ERROR: Erro ao analisar JSON - ${e.message}")
             return false
         }
     } else {
-        logError("Script __NEXT_DATA__ não encontrado.")
+        println("Anroll ERROR: Script __NEXT_DATA__ não encontrado.")
         return false
     }
     
     if (animeSlug != null && episodeNumber != null) {
         val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
         
-        // Loga a URL que será usada antes de tentar abrir
-        logInfo("URL construída com sucesso: $constructedUrl")
+        println("Anroll INFO: URL construída com sucesso: $constructedUrl")
         
         callback.invoke(
             newExtractorLink(
@@ -186,13 +185,12 @@ override suspend fun loadLinks(
                 constructedUrl,
                 ExtractorLinkType.M3U8
             ) {
-                // Adicionando o cabeçalho Referer
                 this.referer = data
             }
         )
         return true
     }
-    logError("Dados necessários (animeSlug ou episodeNumber) não encontrados.")
+    println("Anroll ERROR: Dados necessários (animeSlug ou episodeNumber) não encontrados.")
     return false
 }
 }
