@@ -110,7 +110,7 @@ class Anroll : MainAPI() {
             }
         }
     }
-   override suspend fun load(url: String): LoadResponse? {
+  override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return null
@@ -126,31 +126,40 @@ class Anroll : MainAPI() {
         val plot = animeData.optString("sinopse")
         val idSerie = animeData.optInt("id_serie", 0)
 
-        if (idSerie == 0) return null
-        
-        val episodesUrl = "$mainUrl/api/episodes?id_serie=$idSerie"
-        val episodesResponse = app.get(episodesUrl)
-        val episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
-            ?: return null
-
         val episodes = mutableListOf<Episode>()
-
-        (0 until episodesJsonArray.length()).mapNotNull { i ->
-            val ep = episodesJsonArray.optJSONObject(i)
-            val epTitle = ep?.optString("titulo_episodio", "N/A")
-            val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
-            val epGenId = ep?.optString("generate_id")
+        if (idSerie != 0) {
+            val episodesUrl = "$mainUrl/api/episodes?id_serie=$idSerie"
             
-            if (epGenId != null && epNumber != null) {
-                episodes.add(
-                    newEpisode("$mainUrl/e/$epGenId") {
-                        name = "Episódio $epNumber"
-                        episode = epNumber
+            val episodesResponse = app.get(episodesUrl)
+            
+            try {
+                val episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
+                    ?: return null
+    
+                (0 until episodesJsonArray.length()).mapNotNull { i ->
+                    val ep = episodesJsonArray.optJSONObject(i)
+                    val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
+                    val epGenId = ep?.optString("generate_id")
+                    
+                    if (epGenId != null && epNumber != null) {
+                        episodes.add(
+                            newEpisode("$mainUrl/e/$epGenId") {
+                                name = "Episódio $epNumber"
+                                episode = epNumber
+                            }
+                        )
                     }
-                )
+                }
+            } catch (e: Exception) {
+                // Se a resposta da API não for JSON, a função retorna a página do anime sem episódios.
+                return newAnimeLoadResponse(title, url, TvType.Anime) {
+                    this.posterUrl = poster
+                    this.plot = plot
+                    // Não adiciona episódios
+                }
             }
         }
-        
+
         return newAnimeLoadResponse(title, url, TvType.Anime) {
             this.posterUrl = poster
             this.plot = plot
