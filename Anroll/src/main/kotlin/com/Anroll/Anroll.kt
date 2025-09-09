@@ -6,6 +6,8 @@ import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import java.util.*
 
 class Anroll : MainAPI() {
@@ -13,11 +15,10 @@ class Anroll : MainAPI() {
     override var name = "Anroll"
     override val hasMainPage = true
     override var lang = "pt-br"
-    override val hasDownloadSupport = false
+    override val hasDownloadSupport = true
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime)
 
-    // Ajustado para refletir as categorias do site Anroll.tk
     override val mainPage = mainPageOf(
         "lancamentos" to "Últimos Lançamentos",
         "adicionados" to "Últimos Animes Adicionados"
@@ -27,7 +28,6 @@ class Anroll : MainAPI() {
         val document = app.get(mainUrl).document
         val items = mutableListOf<SearchResponse>()
         
-        // Seletores corrigidos para a página inicial do Anroll.tk
         when (request.data) {
             "lancamentos" -> {
                 document.select("ul.UVrQY li.release-item").forEach { element ->
@@ -83,7 +83,6 @@ class Anroll : MainAPI() {
         val searchUrl = "$mainUrl/?search=$query"
         val document = app.get(searchUrl).document
 
-        // Seletor corrigido para a busca do Anroll.tk
         return document.select("ul.UVrQY li.release-item, ul.ctmcR li.movielistitem").mapNotNull { element ->
             val link = element.selectFirst("a[href]") ?: return@mapNotNull null
             val href = fixUrl(link.attr("href"))
@@ -99,7 +98,6 @@ class Anroll : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
-        // Seletores corrigidos para a página de detalhes do Anroll.tk
         val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
         val title = titleElement.text().trim()
 
@@ -150,33 +148,30 @@ class Anroll : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         
-        // Novo seletor e lógica para extrair o link do vídeo do script JSON
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
         if (scriptTag != null) {
             val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
-            val jsonObject = parseJson<Any>(scriptContent) as? Map<*, *>
-            val videoUrl = jsonObject?.get("props")
-                ?.asLink<Map<*, *>>()?.get("pageProps")
-                ?.asLink<Map<*, *>>()?.get("episodio")
-                ?.asLink<Map<*, *>>()?.get("video_url")
-                ?.asLink<String>()
+            val mapper = ObjectMapper()
+            val jsonObject = mapper.readValue<Map<String, Any>>(scriptContent)
+            
+            val props = jsonObject["props"] as? Map<*, *>
+            val pageProps = props?.get("pageProps") as? Map<*, *>
+            val episodio = pageProps?.get("episodio") as? Map<*, *>
+            val videoUrl = episodio?.get("video_url") as? String
 
             if (videoUrl != null) {
                 callback.invoke(
-                    ExtractorLink(
-                        source = name,
-                        name = "Anroll",
-                        url = fixUrl(videoUrl),
-                        referer = mainUrl,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = true
+                    newExtractorLink(
+                        "Anroll",
+                        "Anroll",
+                        videoUrl,
+                        mainUrl
                     )
                 )
                 return true
             }
         }
 
-        // Lógica para iframes (se eles forem adicionados no futuro)
         val iframeSrc = document.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
         if (iframeSrc != null) {
             app.loadExtractor(iframeSrc, mainUrl, subtitleCallback, callback)
