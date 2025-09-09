@@ -110,9 +110,8 @@ class Anroll : MainAPI() {
             }
         }
     }
-    override suspend fun load(url: String): LoadResponse? {
+   override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
-        
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return null
 
@@ -125,20 +124,28 @@ class Anroll : MainAPI() {
         val title = animeData?.optString("titulo") ?: return null
         val poster = animeData.optString("poster")
         val plot = animeData.optString("sinopse")
+        val idSerie = animeData.optInt("id_serie", 0)
+
+        if (idSerie == 0) return null
+        
+        val episodesUrl = "$mainUrl/api/episodes?id_serie=$idSerie"
+        val episodesResponse = app.get(episodesUrl)
+        val episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
+            ?: return null
 
         val episodes = mutableListOf<Episode>()
 
-        val totalEpisodes = animeData.optInt("episodes")
-
-        val animeSlug = animeData.optString("slug_serie")
-        
-        if (totalEpisodes > 0 && animeSlug.isNotEmpty()) {
-            (1..totalEpisodes).forEach { i ->
-                val epUrl = "$mainUrl/episodio/$animeSlug-$i"
+        (0 until episodesJsonArray.length()).mapNotNull { i ->
+            val ep = episodesJsonArray.optJSONObject(i)
+            val epTitle = ep?.optString("titulo_episodio", "N/A")
+            val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
+            val epGenId = ep?.optString("generate_id")
+            
+            if (epGenId != null && epNumber != null) {
                 episodes.add(
-                    newEpisode(epUrl) {
-                        name = "Episódio $i"
-                        episode = i
+                    newEpisode("$mainUrl/e/$epGenId") {
+                        name = "Episódio $epNumber"
+                        episode = epNumber
                     }
                 )
             }
@@ -150,7 +157,6 @@ class Anroll : MainAPI() {
             addEpisodes(DubStatus.Subbed, episodes.reversed())
         }
     }
-
 override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
@@ -160,18 +166,41 @@ override suspend fun loadLinks(
     val episodeDocument = app.get(data).document
     
     val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
-        ?: return false
     
-    val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
-    val jsonObject = JSONObject(scriptContent)
-    val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+    var animeSlug: String? = null
+    var episodeNumber: String? = null
+
+    if (scriptTag != null) {
+        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+        try {
+            val jsonObject = JSONObject(scriptContent)
+            val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+            
+            // Tentativa 1: Encontrar dados no padrão "episodio"
+            val episodioData = pageProps?.optJSONObject("episodio")
+            if (episodioData != null) {
+                animeSlug = episodioData.optJSONObject("anime")?.optString("slug_serie")
+                episodeNumber = episodioData.optString("n_episodio")
+            }
+            
+            // Tentativa 2: Se falhar, tentar o padrão "data"
+            if (animeSlug == null || episodeNumber == null) {
+                val episodeData = pageProps?.optJSONObject("data")
+                if (episodeData != null) {
+                    animeSlug = episodeData.optJSONObject("anime")?.optString("slug_serie")
+                    episodeNumber = episodeData.optString("n_episodio")
+                }
+            }
+            
+        } catch (e: Exception) {
+            return false
+        }
+    } else {
+        return false
+    }
     
-    val episodeData = pageProps?.optJSONObject("episodio")
-    
-    val videoFilePath = episodeData?.optString("video_file")
-    
-    if (videoFilePath != null && videoFilePath.isNotEmpty()) {
-        val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net$videoFilePath"
+    if (animeSlug != null && episodeNumber != null) {
+        val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
         
         callback.invoke(
             newExtractorLink(
@@ -185,7 +214,6 @@ override suspend fun loadLinks(
         )
         return true
     }
-    
     return false
-}
+} 
 }
