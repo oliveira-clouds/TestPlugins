@@ -110,7 +110,7 @@ class Anroll : MainAPI() {
             }
         }
     }
- override suspend fun load(url: String): LoadResponse? {
+override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return null
@@ -124,30 +124,35 @@ class Anroll : MainAPI() {
         val title = animeData?.optString("titulo") ?: return null
         val poster = animeData.optString("poster")
         val plot = animeData.optString("sinopse")
-        val idSerie = pageProps?.optInt("id_serie", 0)
+        val idSerie = animeData.optInt("id_serie", 0)
 
         val episodes = mutableListOf<Episode>()
 
-        if (idSerie != null && idSerie != 0) {
+        if (idSerie != 0) {
             val episodesUrl = "$mainUrl/api/episodes?id_serie=$idSerie"
-            val episodesResponse = app.get(episodesUrl)
             
-            val episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
-                ?: return null
-    
-            (0 until episodesJsonArray.length()).mapNotNull { i ->
-                val ep = episodesJsonArray.optJSONObject(i)
-                val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
-                val epGenId = ep?.optString("generate_id")
+            try {
+                val episodesResponse = app.get(episodesUrl)
+                val episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
                 
-                if (epGenId != null && epNumber != null) {
-                    episodes.add(
-                        newEpisode("$mainUrl/e/$epGenId") {
-                            name = "Episódio $epNumber"
-                            episode = epNumber
+                if (episodesJsonArray != null) {
+                    (0 until episodesJsonArray.length()).mapNotNull { i ->
+                        val ep = episodesJsonArray.optJSONObject(i)
+                        val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
+                        val epGenId = ep?.optString("generate_id")
+                        
+                        if (epGenId != null && epNumber != null) {
+                            episodes.add(
+                                newEpisode("$mainUrl/e/$epGenId") {
+                                    name = "Episódio $epNumber"
+                                    episode = epNumber
+                                }
+                            )
                         }
-                    )
+                    }
                 }
+            } catch (e: Exception) {
+                // Se a API retornar um erro, o código simplesmente não adiciona os episódios.
             }
         }
 
