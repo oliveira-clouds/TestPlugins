@@ -160,7 +160,7 @@ class Anroll : MainAPI() {
             val videoUrl = episodio?.get("video_url") as? String
 
             if (videoUrl != null) {
-                callback.invoke(
+                callback(
                     newExtractorLink(
                         "Anroll",
                         "Anroll",
@@ -184,7 +184,7 @@ class Anroll : MainAPI() {
                     val fileMatch = Regex("file:\\s*\"([^\"]+)\"").find(scriptContent)
                     if (fileMatch != null) {
                         val videoUrl = fileMatch.groupValues[1]
-                        callback.invoke(
+                        callback(
                             newExtractorLink(
                                 "Anroll",
                                 "Anroll",
