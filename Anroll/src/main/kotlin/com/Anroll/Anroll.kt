@@ -20,9 +20,14 @@ class Anroll : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime)
 
+    override val mainPage = mainPageOf(
+        "lancamentos" to "Últimos Lançamentos",
+        "adicionados" to "Últimos Animes Adicionados"
+    )
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
-        val homePageList = mutableListOf<HomePageList>()
+        val items = mutableListOf<SearchResponse>()
         
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
         
@@ -32,47 +37,53 @@ class Anroll : MainAPI() {
                 val jsonObject = JSONObject(scriptContent)
                 val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
                 
-                val releases = pageProps?.optJSONObject("releases")?.optJSONArray("recent_episodes")
-                val latestEpisodes = releases?.let {
-                    (0 until it.length()).mapNotNull { i ->
-                        val item = it.getJSONObject(i)
-                        val title = item.optString("titulo_episodio")
-                        val url = item.optString("link")
-                        val poster = item.optString("poster")
-                        if (title.isNotEmpty() && url.isNotEmpty() && poster.isNotEmpty()) {
-                            newAnimeSearchResponse(title, url, TvType.Anime) {
-                                this.posterUrl = poster
+                when (request.data) {
+                    "lancamentos" -> {
+                        val releases = pageProps?.optJSONObject("releases")?.optJSONArray("recent_episodes")
+                        releases?.let {
+                            (0 until it.length()).mapNotNull { i ->
+                                val item = it.getJSONObject(i)
+                                val title = item.optString("titulo_episodio")
+                                val url = item.optString("link")
+                                val poster = item.optString("poster")
+                                if (title.isNotEmpty() && url.isNotEmpty() && poster.isNotEmpty()) {
+                                    items.add(newAnimeSearchResponse(title, url, TvType.Anime) { this.posterUrl = poster })
+                                } else {
+                                    null
+                                }
                             }
-                        } else {
-                            null
                         }
                     }
-                } ?: emptyList()
-                homePageList.add(HomePageList("Últimos Lançamentos", latestEpisodes))
-                
-                val animes = pageProps?.optJSONObject("releases")?.optJSONArray("animes")
-                val latestAnimes = animes?.let {
-                    (0 until it.length()).mapNotNull { i ->
-                        val item = it.getJSONObject(i)
-                        val title = item.optString("titulo")
-                        val url = item.optString("link")
-                        val poster = item.optString("poster")
-                        if (title.isNotEmpty() && url.isNotEmpty() && poster.isNotEmpty()) {
-                            newAnimeSearchResponse(title, url, TvType.Anime) {
-                                this.posterUrl = poster
+                    "adicionados" -> {
+                        val animes = pageProps?.optJSONObject("releases")?.optJSONArray("animes")
+                        animes?.let {
+                            (0 until it.length()).mapNotNull { i ->
+                                val item = it.getJSONObject(i)
+                                val title = item.optString("titulo")
+                                val url = item.optString("link")
+                                val poster = item.optString("poster")
+                                if (title.isNotEmpty() && url.isNotEmpty() && poster.isNotEmpty()) {
+                                    items.add(newAnimeSearchResponse(title, url, TvType.Anime) { this.posterUrl = poster })
+                                } else {
+                                    null
+                                }
                             }
-                        } else {
-                            null
                         }
                     }
-                } ?: emptyList()
-                homePageList.add(HomePageList("Últimos Animes Adicionados", latestAnimes))
-
+                }
             } catch (e: Exception) {
-                // Em caso de erro, retorna uma lista vazia
+                // Em caso de erro, a lista de itens ficará vazia
             }
         }
-        return newHomePageResponse(homePageList)
+        
+        return newHomePageResponse(
+            list = HomePageList(
+                name = request.name,
+                list = items,
+                isHorizontalImages = false
+            ),
+            hasNext = false
+        )
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
