@@ -11,8 +11,6 @@ import org.json.JSONObject
 import org.jsoup.Jsoup
 import java.util.regex.Pattern
 
-
-
 class Anroll : MainAPI() {
     override var mainUrl = "https://www.anroll.net"
     override var name = "Anroll"
@@ -33,13 +31,36 @@ class Anroll : MainAPI() {
         
         when (request.data) {
             "lancamentos" -> {
+                // Manter sua lógica original para Últimos Lançamentos, conforme solicitado
                 document.select("ul.UVrQY li.release-item").forEach { element ->
                     parseLancamentoCard(element)?.let { items.add(it) }
                 }
             }
             "adicionados" -> {
-                document.select("ul.ctmcR li.movielistitem").forEach { element ->
-                    parseAdicionadoCard(element)?.let { items.add(it) }
+                // **Nova lógica: Extrair do JSON para Últimos Animes Adicionados**
+                val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+                if (scriptTag != null) {
+                    val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+                    try {
+                        val jsonObject = JSONObject(scriptContent)
+                        val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+                        val animes = pageProps?.optJSONObject("releases")?.optJSONArray("animes")
+                        animes?.let {
+                            (0 until it.length()).mapNotNull { i ->
+                                val item = it.getJSONObject(i)
+                                val title = item.optString("titulo")
+                                val url = item.optString("link")
+                                val poster = item.optString("poster")
+                                if (title.isNotEmpty() && url.isNotEmpty() && poster.isNotEmpty()) {
+                                    items.add(newAnimeSearchResponse(title, url, TvType.Anime) { this.posterUrl = poster })
+                                } else {
+                                    null
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Não faz nada, a lista ficará vazia em caso de erro
+                    }
                 }
             }
         }
@@ -71,29 +92,27 @@ class Anroll : MainAPI() {
         }
     }
 
+    // Esta função não é mais necessária já que a lista de animes adicionados será extraída do JSON
     private fun parseAdicionadoCard(element: Element): SearchResponse? {
-        val link = element.selectFirst("a[href]") ?: return null
-        val href = fixUrl(link.attr("href"))
-        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
-        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
-
-        return newAnimeSearchResponse(title, href, TvType.Anime) {
-            this.posterUrl = posterUrl
-        }
+        return null 
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?search=$query"
+        // **Nova lógica: Corrigir a URL de busca**
+        val searchUrl = "$mainUrl/buscar?s=$query"
         val document = app.get(searchUrl).document
 
-        return document.select("ul.UVrQY li.release-item, ul.ctmcR li.movielistitem").mapNotNull { element ->
-            val link = element.selectFirst("a[href]") ?: return@mapNotNull null
-            val href = fixUrl(link.attr("href"))
-            val title = element.selectFirst("h1")?.text()?.trim() ?: return@mapNotNull null
-            val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
-
-            newAnimeSearchResponse(title, href, TvType.Anime) {
-                this.posterUrl = posterUrl
+        return document.select("div.list-anime-items div.item").mapNotNull { element ->
+            val title = element.selectFirst("div.title > a")?.text()
+            val url = element.selectFirst("a")?.attr("href")
+            val poster = element.selectFirst("div.img > img")?.attr("src")
+            
+            if (title != null && url != null && poster != null) {
+                newAnimeSearchResponse(title, url, TvType.Anime) {
+                    this.posterUrl = poster
+                }
+            } else {
+                null
             }
         }
     }
@@ -143,63 +162,61 @@ class Anroll : MainAPI() {
         }
     }
 
-override suspend fun loadLinks(
-    data: String,
-    isCasting: Boolean,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-): Boolean {
-    val episodeDocument = app.get(data).document
-    
-    val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
-    
-    var animeSlug: String? = null
-    var episodeNumber: String? = null
-
-    if (scriptTag != null) {
-        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
-        try {
-            val jsonObject = JSONObject(scriptContent)
-            val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
-            
-            
-            val episodioData = pageProps?.optJSONObject("episodio")
-            if (episodioData != null) {
-                animeSlug = episodioData.optJSONObject("anime")?.optString("slug_serie")
-                episodeNumber = episodioData.optString("n_episodio")
-            }
-            
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val episodeDocument = app.get(data).document
         
-            if (animeSlug == null || episodeNumber == null) {
-                val episodeData = pageProps?.optJSONObject("data")
-                if (episodeData != null) {
-                    animeSlug = episodeData.optJSONObject("anime")?.optString("slug_serie")
-                    episodeNumber = episodeData.optString("n_episodio")
+        val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
+        
+        var animeSlug: String? = null
+        var episodeNumber: String? = null
+
+        if (scriptTag != null) {
+            val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+            try {
+                val jsonObject = JSONObject(scriptContent)
+                val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+                
+                val episodioData = pageProps?.optJSONObject("episodio")
+                if (episodioData != null) {
+                    animeSlug = episodioData.optJSONObject("anime")?.optString("slug_serie")
+                    episodeNumber = episodioData.optString("n_episodio")
                 }
+                
+                if (animeSlug == null || episodeNumber == null) {
+                    val episodeData = pageProps?.optJSONObject("data")
+                    if (episodeData != null) {
+                        animeSlug = episodeData.optJSONObject("anime")?.optString("slug_serie")
+                        episodeNumber = episodeData.optString("n_episodio")
+                    }
+                }
+                
+            } catch (e: Exception) {
+                return false
             }
-            
-        } catch (e: Exception) {
+        } else {
             return false
         }
-    } else {
+        
+        if (animeSlug != null && episodeNumber != null) {
+            val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
+            
+            callback.invoke(
+                newExtractorLink(
+                    "Anroll",
+                    "Anroll",
+                    constructedUrl,
+                    ExtractorLinkType.M3U8
+                ) {
+                    this.referer = data
+                }
+            )
+            return true
+        }
         return false
     }
-    
-    if (animeSlug != null && episodeNumber != null) {
-        val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
-        
-        callback.invoke(
-            newExtractorLink(
-                "Anroll",
-                "Anroll",
-                constructedUrl,
-                ExtractorLinkType.M3U8
-            ) {
-                this.referer = data
-            }
-        )
-        return true
-    }
-    return false
-}
 }
