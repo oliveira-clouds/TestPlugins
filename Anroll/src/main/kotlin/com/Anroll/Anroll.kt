@@ -165,7 +165,7 @@ class Anroll : MainAPI() {
                         "Anroll",
                         "Anroll",
                         fixUrl(videoUrl),
-                        mainUrl
+                        mainUrl,
                     )
                 )
                 return true
