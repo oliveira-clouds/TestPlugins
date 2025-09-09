@@ -139,57 +139,46 @@ class Anroll : MainAPI() {
     }
 
     override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val document = app.get(data).document
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    // Passo 1: Obter a URL do player da página do episódio
+    val episodeDocument = app.get(data).document
+    val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
+    
+    if (scriptTag != null) {
+        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+        val mapper = ObjectMapper()
+        val jsonObject = mapper.readValue<Map<String, Any>>(scriptContent)
         
-        val scriptTag = document.selectFirst("script#__NEXT_DATA__")
-        if (scriptTag != null) {
-            val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
-            val mapper = ObjectMapper()
-            val jsonObject = mapper.readValue<Map<String, Any>>(scriptContent)
-            
-            val props = jsonObject["props"] as? Map<*, *>
-            val pageProps = props?.get("pageProps") as? Map<*, *>
-            val episodio = pageProps?.get("episodio") as? Map<*, *>
-            val videoUrl = episodio?.get("video_url") as? String
+        val props = jsonObject["props"] as? Map<*, *>
+        val pageProps = props?.get("pageProps") as? Map<*, *>
+        val episodio = pageProps?.get("episodio") as? Map<*, *>
+        val playerUrlFromScript = episodio?.get("video_url") as? String
 
-            if (videoUrl != null) {
-                callback(
-                    newExtractorLink(
-                        "Anroll",
-                        "Anroll",
-                        fixUrl(videoUrl),
-                        ExtractorLinkType.M3U8
-                    ) {
-                        this.referer = mainUrl
-                    }
-                )
-                return true
-            }
-        }
+        if (playerUrlFromScript != null) {
+            // Passo 2: Acessar a página do player e encontrar a URL do iframe
+            val playerDocument = app.get(fixUrl(playerUrlFromScript)).document
+            val iframeSrc = playerDocument.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
 
-        val iframeSrc = document.selectFirst("iframe")?.attr("src")?.let { fixUrl(it) }
-        if (iframeSrc != null) {
-            val iframeDocument = app.get(iframeSrc).document
-            val scripts = iframeDocument.select("script")
-            for (script in scripts) {
-                val scriptContent = script.html()
-                if (scriptContent.contains("sources") && scriptContent.contains("file")) {
-                    val fileMatch = Regex("file:\\s*\"([^\"]+)\"").find(scriptContent)
-                    if (fileMatch != null) {
-                        val videoUrl = fileMatch.groupValues[1]
-                        callback(
+            if (iframeSrc != null) {
+                // Passo 3: Acessar o iframe e extrair o link do video
+                val iframeDocument = app.get(iframeSrc).document
+                val sourceTag = iframeDocument.selectFirst("video source[type=\"application/x-mpegurl\"]")
+                
+                if (sourceTag != null) {
+                    val videoUrl = sourceTag.attr("src")
+                    if (videoUrl.isNotBlank()) {
+                        callback.invoke(
                             newExtractorLink(
                                 "Anroll",
                                 "Anroll",
                                 fixUrl(videoUrl),
                                 ExtractorLinkType.M3U8
                             ) {
-                                this.referer = iframeSrc
+                                this.referer = iframeSrc // o referer agora é a URL do iframe
                             }
                         )
                         return true
@@ -197,7 +186,6 @@ class Anroll : MainAPI() {
                 }
             }
         }
-
-        return false
     }
+    return false
 }
