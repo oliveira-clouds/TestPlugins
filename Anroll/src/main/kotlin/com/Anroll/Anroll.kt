@@ -52,13 +52,20 @@ class Anroll : MainAPI() {
                 val title = entry?.optString("titulo") ?: entry?.optString("nome_filme") ?: ""
                 val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme")
                 val url = "$mainUrl/a/${entry?.optString("generate_id")}"
-                val type = if (request.data == "filmes") TvType.Movie else TvType.Anime
                 
-                items.add(
-                    newSearchResponse(title, url, type) {
-                        this.posterUrl = posterUrl
-                    }
-                )
+                if (request.data == "filmes") {
+                    items.add(
+                        newMovieSearchResponse(title, url, TvType.Movie) {
+                            this.posterUrl = posterUrl
+                        }
+                    )
+                } else {
+                    items.add(
+                        newAnimeSearchResponse(title, url, TvType.Anime) {
+                            this.posterUrl = posterUrl
+                        }
+                    )
+                }
             }
         }
         
