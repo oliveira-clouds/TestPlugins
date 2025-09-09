@@ -177,7 +177,7 @@ override suspend fun loadLinks(
                 "Anroll",
                 "Anroll",
                 constructedUrl,
-                mainUrl
+                ExtractorLinkType.M3U8 // Argumento corrigido
             )
         )
         return true
