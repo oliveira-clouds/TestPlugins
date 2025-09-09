@@ -151,20 +151,25 @@ override suspend fun loadLinks(
     var animeSlug: String? = null
     var episodeNumber: String? = null
 
-    try {
-        if (scriptTag != null) {
-            val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+    if (scriptTag != null) {
+        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+        try {
             val jsonObject = JSONObject(scriptContent)
             
-            val props = jsonObject.getJSONObject("props")
-            val pageProps = props.getJSONObject("pageProps")
-            val episodio = pageProps.getJSONObject("episodio")
-            val animeData = episodio.getJSONObject("anime")
+            // Usando métodos "opt" para evitar erros se as chaves não existirem
+            val props = jsonObject.optJSONObject("props")
+            val pageProps = props?.optJSONObject("pageProps")
+            val episodio = pageProps?.optJSONObject("episodio")
+            val animeData = episodio?.optJSONObject("anime")
             
-            animeSlug = animeData.getString("slug_serie")
-            episodeNumber = episodio.getString("n_episodio")
+            animeSlug = animeData?.optString("slug_serie")
+            episodeNumber = episodio?.optString("n_episodio")
+            
+        } catch (e: Exception) {
+            // Em caso de erro na análise, a função retorna false
+            return false
         }
-    } catch (e: Exception) {
+    } else {
         return false
     }
     
@@ -178,6 +183,7 @@ override suspend fun loadLinks(
                 constructedUrl,
                 ExtractorLinkType.M3U8
             ) {
+                // Adicionando o cabeçalho Referer com a URL do episódio
                 this.referer = data
             }
         )
