@@ -124,12 +124,12 @@ override suspend fun load(url: String): LoadResponse? {
         val title = animeData?.optString("titulo") ?: return null
         val poster = animeData.optString("poster")
         val plot = animeData.optString("sinopse")
-        val idSerie = animeData.optInt("id_serie", 0)
+        val idSerie = animeData?.optInt("id_serie", 0)
 
         val episodes = mutableListOf<Episode>()
 
-        if (idSerie != 0) {
-            val episodesUrl = "$mainUrl/api/episodes?id_serie=$idSerie"
+        if (idSerie != null && idSerie != 0) {
+            val episodesUrl = "https://apiv3-prd.anroll.net/animes/$idSerie/episodes"
             
             try {
                 val episodesResponse = app.get(episodesUrl)
