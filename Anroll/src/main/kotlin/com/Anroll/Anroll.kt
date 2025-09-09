@@ -161,11 +161,13 @@ class Anroll : MainAPI() {
 
             if (videoUrl != null) {
                 callback.invoke(
-                    newExtractorLink(
-                        "Anroll",
-                        "Anroll",
-                        videoUrl,
-                        mainUrl
+                    ExtractorLink(
+                        source = "Anroll",
+                        name = "Anroll",
+                        url = fixUrl(videoUrl),
+                        referer = mainUrl,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = true
                     )
                 )
                 return true
