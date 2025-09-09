@@ -17,6 +17,7 @@ class Anroll : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime)
 
+    // Ajustado para refletir as categorias do site Anroll.tk
     override val mainPage = mainPageOf(
         "lancamentos" to "Últimos Lançamentos",
         "adicionados" to "Últimos Animes Adicionados"
@@ -26,6 +27,7 @@ class Anroll : MainAPI() {
         val document = app.get(mainUrl).document
         val items = mutableListOf<SearchResponse>()
         
+        // Seletores corrigidos para a página inicial do Anroll.tk
         when (request.data) {
             "lancamentos" -> {
                 document.select("ul.UVrQY li.release-item").forEach { element ->
@@ -81,6 +83,7 @@ class Anroll : MainAPI() {
         val searchUrl = "$mainUrl/?search=$query"
         val document = app.get(searchUrl).document
 
+        // Seletor corrigido para a busca do Anroll.tk
         return document.select("ul.UVrQY li.release-item, ul.ctmcR li.movielistitem").mapNotNull { element ->
             val link = element.selectFirst("a[href]") ?: return@mapNotNull null
             val href = fixUrl(link.attr("href"))
@@ -96,6 +99,7 @@ class Anroll : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
+        // Seletores corrigidos para a página de detalhes do Anroll.tk
         val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
         val title = titleElement.text().trim()
 
@@ -152,10 +156,10 @@ class Anroll : MainAPI() {
             val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
             val jsonObject = parseJson<Any>(scriptContent) as? Map<*, *>
             val videoUrl = jsonObject?.get("props")
-                ?.as-link<Map<*, *>>()?.get("pageProps")
-                ?.as-link<Map<*, *>>()?.get("episodio")
-                ?.as-link<Map<*, *>>()?.get("video_url")
-                ?.as-link<String>()
+                ?.asLink<Map<*, *>>()?.get("pageProps")
+                ?.asLink<Map<*, *>>()?.get("episodio")
+                ?.asLink<Map<*, *>>()?.get("video_url")
+                ?.asLink<String>()
 
             if (videoUrl != null) {
                 callback.invoke(
