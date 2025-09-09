@@ -31,13 +31,11 @@ class Anroll : MainAPI() {
         
         when (request.data) {
             "lancamentos" -> {
-                // Manter sua lógica original para Últimos Lançamentos, conforme solicitado
                 document.select("ul.UVrQY li.release-item").forEach { element ->
                     parseLancamentoCard(element)?.let { items.add(it) }
                 }
             }
             "adicionados" -> {
-                // **Nova lógica: Extrair do JSON para Últimos Animes Adicionados**
                 val scriptTag = document.selectFirst("script#__NEXT_DATA__")
                 if (scriptTag != null) {
                     val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
@@ -92,13 +90,11 @@ class Anroll : MainAPI() {
         }
     }
 
-    // Esta função não é mais necessária já que a lista de animes adicionados será extraída do JSON
     private fun parseAdicionadoCard(element: Element): SearchResponse? {
         return null 
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // **Nova lógica: Corrigir a URL de busca**
         val searchUrl = "$mainUrl/buscar?s=$query"
         val document = app.get(searchUrl).document
 
