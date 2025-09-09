@@ -138,16 +138,16 @@ class Anroll : MainAPI() {
         }
     }
 
-   override suspend fun loadLinks(
+ override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    // Passo 1: Obter a URL do player da página do episódio
     val episodeDocument = app.get(data).document
     val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
     
+    val videoUrl: String?
     if (scriptTag != null) {
         val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
         val mapper = ObjectMapper()
@@ -156,31 +156,34 @@ class Anroll : MainAPI() {
         val props = jsonObject["props"] as? Map<*, *>
         val pageProps = props?.get("pageProps") as? Map<*, *>
         val episodio = pageProps?.get("episodio") as? Map<*, *>
-        val playerUrlFromScript = episodio?.get("video_url") as? String
+        videoUrl = episodio?.get("video_url") as? String
+    } else {
+        return false // Falha ao encontrar o script com a URL
+    }
+    
+    // Se a URL do vídeo for encontrada
+    if (videoUrl != null) {
+        // 2. Fazer uma requisição GET para a URL do vídeo real com o Referer correto
+        val videoResponse = app.get(videoUrl, referer = mainUrl)
 
-        if (playerUrlFromScript != null) {
-            // Passo 2: Acessar a página do player e encontrar a tag <video>
-            val playerDocument = app.get(fixUrl(playerUrlFromScript)).document
-            
-            // Procura o link diretamente na tag <source> do player
-            val sourceTag = playerDocument.selectFirst("video source[type=\"application/x-mpegurl\"]")
-            
-            if (sourceTag != null) {
-                val videoUrl = sourceTag.attr("src")
-                if (videoUrl.isNotBlank()) {
-                    callback.invoke(
-                        newExtractorLink(
-                            "Anroll",
-                            "Anroll",
-                            fixUrl(videoUrl),
-                            ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = playerUrlFromScript // o referer agora é a URL do player
-                        }
-                    )
-                    return true
+        // 3. Extrair o link real do m3u8 da resposta
+        // A resposta pode ser a própria URL final, ou um JSON/HTML que a contém.
+        // O caso mais provável é que a requisição GET retorne o link do m3u8.
+        val finalUrl = videoResponse.url
+
+        if (finalUrl.isNotBlank()) {
+            // 4. Injetar o link no player do Cloudstream
+            callback.invoke(
+                newExtractorLink(
+                    "Anroll",
+                    "Anroll",
+                    finalUrl,
+                    ExtractorLinkType.M3U8
+                ) {
+                    this.referer = "https://www.anroll.net" // O Referer precisa ser o domínio principal do site
                 }
-            }
+            )
+            return true
         }
     }
     return false
