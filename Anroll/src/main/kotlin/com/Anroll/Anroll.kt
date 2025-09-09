@@ -189,3 +189,4 @@ class Anroll : MainAPI() {
     }
     return false
 }
+}
