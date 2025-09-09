@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import java.util.*
 import org.json.JSONObject
+import java.util.regex.Pattern
 
 class Anroll : MainAPI() {
     override var mainUrl = "https://www.anroll.net"
