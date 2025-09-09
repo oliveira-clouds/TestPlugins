@@ -84,18 +84,16 @@ class Anroll : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
         val response = app.get(searchUrl)
-        val jsonString = response.text
-        
-        val jsonArray = JSONObject(jsonString).optJSONArray("data") ?: return emptyList()
+        val jsonArray = JSONObject(response.text).optJSONArray("data") ?: return emptyList()
 
         return (0 until jsonArray.length()).mapNotNull { i ->
             val item = jsonArray.optJSONObject(i)
             val title = item?.optString("titulo")
             val poster = item?.optString("poster")
-            val url = item?.optString("link")
+            val slug = item?.optString("slug")
             
-            if (title != null && url != null && poster != null) {
-                newAnimeSearchResponse(title, url, TvType.Anime) {
+            if (title != null && slug != null && poster != null) {
+                newAnimeSearchResponse(title, "$mainUrl/anime/$slug", TvType.Anime) {
                     this.posterUrl = poster
                 }
             } else {
