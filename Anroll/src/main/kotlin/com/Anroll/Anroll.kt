@@ -1,9 +1,7 @@
 package com.Anroll
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
 import com.fasterxml.jackson.databind.ObjectMapper
