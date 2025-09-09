@@ -138,12 +138,13 @@ class Anroll : MainAPI() {
         }
     }
 
- override suspend fun loadLinks(
+override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
+    // 1. Obter a página principal do episódio
     val episodeDocument = app.get(data).document
     val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
     
@@ -156,35 +157,32 @@ class Anroll : MainAPI() {
         val props = jsonObject["props"] as? Map<*, *>
         val pageProps = props?.get("pageProps") as? Map<*, *>
         val episodio = pageProps?.get("episodio") as? Map<*, *>
-        videoUrl = episodio?.get("video_url") as? String
+        
+        val animeData = episodio?.get("anime") as? Map<*, *>
+        val animeSlug = animeData?.get("slug_serie") as? String
+        val episodeNumber = episodio?.get("n_episodio") as? String
+        
+    
+        if (animeSlug != null && episodeNumber != null) {
+            val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
+            videoUrl = constructedUrl
+        } else {
+            return false // Falha ao encontrar os dados necessários
+        }
     } else {
-        return false // Falha ao encontrar o script com a URL
+        return false // Falha ao encontrar o script
     }
     
-    // Se a URL do vídeo for encontrada
     if (videoUrl != null) {
-        // 2. Fazer uma requisição GET para a URL do vídeo real com o Referer correto
-        val videoResponse = app.get(videoUrl, referer = mainUrl)
-
-        // 3. Extrair o link real do m3u8 da resposta
-        // A resposta pode ser a própria URL final, ou um JSON/HTML que a contém.
-        // O caso mais provável é que a requisição GET retorne o link do m3u8.
-        val finalUrl = videoResponse.url
-
-        if (finalUrl.isNotBlank()) {
-            // 4. Injetar o link no player do Cloudstream
-            callback.invoke(
-                newExtractorLink(
-                    "Anroll",
-                    "Anroll",
-                    finalUrl,
-                    ExtractorLinkType.M3U8
-                ) {
-                    this.referer = "https://www.anroll.net" // O Referer precisa ser o domínio principal do site
-                }
+        callback.invoke(
+            newExtractorLink(
+                "Anroll",
+                "Anroll",
+                videoUrl,
+                mainUrl
             )
-            return true
-        }
+        )
+        return true
     }
     return false
 }
