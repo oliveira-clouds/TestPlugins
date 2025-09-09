@@ -11,7 +11,6 @@ import org.json.JSONObject
 import org.jsoup.Jsoup
 import java.util.regex.Pattern
 
-
 class Anroll : MainAPI() {
     override var mainUrl = "https://www.anroll.net"
     override var name = "Anroll"
@@ -43,7 +42,9 @@ class Anroll : MainAPI() {
                         val url = item.optString("link")
                         val poster = item.optString("poster")
                         if (title.isNotEmpty() && url.isNotEmpty() && poster.isNotEmpty()) {
-                            newAnimeSearchResponse(title, url, poster)
+                            newAnimeSearchResponse(title, url, TvType.Anime) {
+                                this.posterUrl = poster
+                            }
                         } else {
                             null
                         }
@@ -60,7 +61,9 @@ class Anroll : MainAPI() {
                         val url = item.optString("link")
                         val poster = item.optString("poster")
                         if (title.isNotEmpty() && url.isNotEmpty() && poster.isNotEmpty()) {
-                            newAnimeSearchResponse(title, url, poster)
+                            newAnimeSearchResponse(title, url, TvType.Anime) {
+                                this.posterUrl = poster
+                            }
                         } else {
                             null
                         }
@@ -75,7 +78,6 @@ class Anroll : MainAPI() {
         return newHomePageResponse(homePageList)
     }
 
-    // A função de busca agora usa a URL de pesquisa correta
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/buscar?s=$query"
         val document = app.get(searchUrl).document
@@ -86,7 +88,9 @@ class Anroll : MainAPI() {
             val poster = element.selectFirst("div.img > img")?.attr("src")
             
             if (title != null && url != null && poster != null) {
-                newAnimeSearchResponse(title, url, poster)
+                newAnimeSearchResponse(title, url, TvType.Anime) {
+                    this.posterUrl = poster
+                }
             } else {
                 null
             }
