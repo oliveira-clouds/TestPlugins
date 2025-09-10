@@ -26,7 +26,7 @@ class Anroll : MainAPI() {
     "adicionados" to "Animes em Alta",
     "filmes" to "Filmes"
 )
-         override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+             override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return newHomePageResponse(request.name, emptyList())
@@ -50,7 +50,7 @@ class Anroll : MainAPI() {
             (0 until listArray.length()).forEach { i ->
                 val entry = listArray.optJSONObject(i)
                 val title = entry?.optString("titulo") ?: entry?.optString("nome_filme") ?: ""
-                val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme")
+                val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme") ?: "" // Adicionado o operador elvis para garantir que não seja nulo
                 val url = "$mainUrl/a/${entry?.optString("generate_id")}"
                 
                 if (request.data == "filmes") {
@@ -77,7 +77,7 @@ class Anroll : MainAPI() {
             ),
             hasNext = false
         )
-         }
+             }
          
      override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
