@@ -26,7 +26,7 @@ class Anroll : MainAPI() {
     "adicionados" to "Animes em Alta",
     "filmes" to "Filmes"
 )
- override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return newHomePageResponse(request.name, emptyList())
@@ -78,6 +78,7 @@ class Anroll : MainAPI() {
             hasNext = false
         )
     }
+
     
      override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
