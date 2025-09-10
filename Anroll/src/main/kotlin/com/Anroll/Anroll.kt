@@ -26,7 +26,7 @@ class Anroll : MainAPI() {
     "adicionados" to "Animes em Alta",
     "filmes" to "Filmes"
 )
-                 override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+              override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return newHomePageResponse(request.name, emptyList())
@@ -39,7 +39,13 @@ class Anroll : MainAPI() {
             ?: return newHomePageResponse(request.name, emptyList())
 
         val items = mutableListOf<SearchResponse>()
-        val listArray = lists.optJSONArray(request.data)
+        val listKey = when (request.data) {
+            "lancamentos" -> "releases"
+            "adicionados" -> "animes"
+            "filmes" -> "movies"
+            else -> null
+        }
+        val listArray = lists.optJSONArray(listKey)
         
         if (listArray != null) {
             (0 until listArray.length()).forEach { i ->
@@ -47,17 +53,17 @@ class Anroll : MainAPI() {
                 val title = entry?.optString("titulo") ?: entry?.optString("nome_filme") ?: ""
                 val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme") ?: ""
                 val url = "$mainUrl/a/${entry?.optString("generate_id")}"
-                val type = if (request.data == "filmes") TvType.Movie else TvType.Anime
+                val type = if (listKey == "movies") TvType.Movie else TvType.Anime
                 
-                if (request.data == "filmes") {
+                if (type == TvType.Movie) {
                     items.add(
-                        newMovieSearchResponse(title, url, TvType.Movie) {
+                        newMovieSearchResponse(title, url, type) {
                             this.posterUrl = fixUrl(posterUrl)
                         }
                     )
                 } else {
                     items.add(
-                        newAnimeSearchResponse(title, url, TvType.Anime) {
+                        newAnimeSearchResponse(title, url, type) {
                             this.posterUrl = fixUrl(posterUrl)
                         }
                     )
@@ -73,7 +79,8 @@ class Anroll : MainAPI() {
             ),
             hasNext = false
         )
-                 }
+              }
+              
                  
          
      override suspend fun search(query: String): List<SearchResponse> {
