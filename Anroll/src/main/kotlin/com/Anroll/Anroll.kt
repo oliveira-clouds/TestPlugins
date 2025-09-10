@@ -26,12 +26,14 @@ class Anroll : MainAPI() {
         "animes" to "Animes em Alta",
         "movies" to "Filmes"
     )
-                  override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+                  
+               override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return newHomePageResponse(request.name, emptyList())
 
-        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+        // Usado o método `data()` para obter o conteúdo bruto da tag de script
+        val scriptContent = scriptTag.data()
         val jsonObject = JSONObject(scriptContent)
         val lists = jsonObject.optJSONObject("props")
             ?.optJSONObject("pageProps")
@@ -40,7 +42,7 @@ class Anroll : MainAPI() {
 
         val items = mutableListOf<SearchResponse>()
         val listArray = lists.optJSONArray(request.data)
-
+        
         if (listArray != null) {
             (0 until listArray.length()).forEach { i ->
                 val entry = listArray.optJSONObject(i)
@@ -73,10 +75,8 @@ class Anroll : MainAPI() {
             ),
             hasNext = false
         )
-                  }
-                  
-              
-                 
+               }
+               
          
      override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
