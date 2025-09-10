@@ -21,12 +21,12 @@ class Anroll : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime)
     
-     override val mainPage = mainPageOf(
-    "lancamentos" to "Lançamentos",
-    "adicionados" to "Animes em Alta",
-    "filmes" to "Filmes"
-)
-              override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+         override val mainPage = mainPageOf(
+        "releases" to "Lançamentos",
+        "animes" to "Animes em Alta",
+        "movies" to "Filmes"
+    )
+                  override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return newHomePageResponse(request.name, emptyList())
@@ -39,21 +39,15 @@ class Anroll : MainAPI() {
             ?: return newHomePageResponse(request.name, emptyList())
 
         val items = mutableListOf<SearchResponse>()
-        val listKey = when (request.data) {
-            "lancamentos" -> "releases"
-            "adicionados" -> "animes"
-            "filmes" -> "movies"
-            else -> null
-        }
-        val listArray = lists.optJSONArray(listKey)
-        
+        val listArray = lists.optJSONArray(request.data)
+
         if (listArray != null) {
             (0 until listArray.length()).forEach { i ->
                 val entry = listArray.optJSONObject(i)
                 val title = entry?.optString("titulo") ?: entry?.optString("nome_filme") ?: ""
                 val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme") ?: ""
                 val url = "$mainUrl/a/${entry?.optString("generate_id")}"
-                val type = if (listKey == "movies") TvType.Movie else TvType.Anime
+                val type = if (request.data == "movies") TvType.Movie else TvType.Anime
                 
                 if (type == TvType.Movie) {
                     items.add(
@@ -79,7 +73,8 @@ class Anroll : MainAPI() {
             ),
             hasNext = false
         )
-              }
+                  }
+                  
               
                  
          
