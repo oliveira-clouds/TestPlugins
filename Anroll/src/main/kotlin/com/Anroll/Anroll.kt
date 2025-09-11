@@ -60,7 +60,7 @@ class Anroll : MainAPI() {
                         title = anime?.optString("titulo") ?: ""
                         val generateId = episode?.optString("generate_id") ?: ""
                         url = "$mainUrl/e/$generateId"
-                        posterUrl = "" // A lista de releases não tem URL de pôster, então a deixamos vazia
+                        posterUrl = ""
                         type = TvType.Anime
                     }
                     "data_animes" -> {
@@ -113,18 +113,7 @@ class Anroll : MainAPI() {
             ),
             hasNext = false
         )
-    }
-        
-        return newHomePageResponse(
-            list = HomePageList(
-                name = request.name,
-                list = items,
-                isHorizontalImages = false
-            ),
-            hasNext = false
-        )
-    }
-         
+    }    
      override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
         val response = app.get(searchUrl)
