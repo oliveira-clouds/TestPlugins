@@ -45,7 +45,7 @@ class Anroll : MainAPI() {
         if (listArray != null) {
             (0 until listArray.length()).forEach { i ->
                 val entry = listArray.optJSONObject(i)
-
+                
                 val title: String
                 val url: String
                 val type: TvType
@@ -61,8 +61,6 @@ class Anroll : MainAPI() {
                         generateId = episode?.optString("generate_id") ?: ""
                         url = "$mainUrl/e/$generateId"
                         type = TvType.Anime
-
-                        // Buscando a capa no HTML com base no ID
                         posterUrl = document.select("a[href*=${anime?.optString("slug_serie")}]").select("img").attr("src")
                     }
                     "data_animes" -> {
@@ -70,8 +68,6 @@ class Anroll : MainAPI() {
                         generateId = entry?.optString("generate_id") ?: ""
                         url = "$mainUrl/a/$generateId"
                         type = TvType.Anime
-                        
-                        // Buscando a capa no HTML com base no ID
                         posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
                     }
                     "data_movies" -> {
@@ -79,8 +75,6 @@ class Anroll : MainAPI() {
                         generateId = entry?.optString("generate_id") ?: ""
                         url = "$mainUrl/f/$generateId"
                         type = TvType.Movie
-                        
-                        // Buscando a capa no HTML com base no ID
                         posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
                     }
                     else -> {
@@ -119,7 +113,6 @@ class Anroll : MainAPI() {
             hasNext = false
         )
     }
-   
      override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
         val response = app.get(searchUrl)
@@ -149,7 +142,8 @@ class Anroll : MainAPI() {
             }
         }
     }
- override suspend fun load(url: String): LoadResponse? {
+     
+override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return null
@@ -166,12 +160,13 @@ class Anroll : MainAPI() {
             val animeData = pageProps?.optJSONObject("data")?.optJSONObject("episode")
             val title = animeData?.optString("n_episodio")?.let { "Episódio $it" } ?: ""
             val plot = animeData?.optString("sinopse") ?: ""
+            val episodeUrl = "$mainUrl/e/${animeData?.optString("generate_id")}"
             
             return newAnimeLoadResponse(title, url, TvType.Anime) {
                 this.plot = plot
                 addEpisodes(
                     DubStatus.Subbed,
-                    listOf(newEpisode(url) {
+                    listOf(newEpisode(episodeUrl) {
                         name = title
                         episode = animeData?.optString("n_episodio")?.toIntOrNull()
                     })
