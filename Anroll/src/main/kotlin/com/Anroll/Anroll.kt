@@ -151,7 +151,7 @@ override suspend fun load(url: String): LoadResponse? {
         val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
         val jsonObject = JSONObject(scriptContent)
         val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
-        
+
         val isEpisode = url.contains("/e/")
         val isMovie = url.contains("/f/")
         val isSeries = url.contains("/a/")
@@ -180,7 +180,7 @@ override suspend fun load(url: String): LoadResponse? {
             val plot = movieData.optString("sinopse_filme")
             val movieUrl = "$mainUrl/f/${movieData.optString("generate_id")}"
             
-            return newMovieLoadResponse(title, movieUrl, TvType.Movie) {
+            return newMovieLoadResponse(title, url, TvType.Movie) {
                 this.posterUrl = poster
                 this.plot = plot
                 addEpisodes(
