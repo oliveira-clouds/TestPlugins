@@ -22,108 +22,62 @@ class Anroll : MainAPI() {
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime, TvType.Movie)
     
          override val mainPage = mainPageOf(
-        "releases" to "Lançamentos",
-        "animes" to "Animes",
-        "movies" to "Filmes"
+        "data_releases" to "Lançamentos",
+        "data_animes" to "Animes em Alta",
+        "data_movies" to "Filmes"
     )
                   
-           override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return newHomePageResponse(request.name, emptyList())
 
         val scriptContent = scriptTag.data()
         val jsonObject = JSONObject(scriptContent)
-        val lists = jsonObject.optJSONObject("props")
+        val data = jsonObject.optJSONObject("props")
             ?.optJSONObject("pageProps")
-            ?.optJSONObject("lists")
+            ?.optJSONObject("data")
             ?: return newHomePageResponse(request.name, emptyList())
-            
-        val homepageLists = mutableListOf<HomePageList>()
+
+        val items = mutableListOf<SearchResponse>()
+        val listArray = data.optJSONArray(request.data)
         
-        // Criando a lista de Lançamentos
-        val releasesArray = lists.optJSONArray("releases")
-        if (releasesArray != null) {
-            val items = mutableListOf<SearchResponse>()
-            (0 until releasesArray.length()).forEach { i ->
-                val entry = releasesArray.optJSONObject(i)
-                val title = entry?.optString("titulo") ?: ""
-                val posterUrl = entry?.optString("poster") ?: ""
+        if (listArray != null) {
+            (0 until listArray.length()).forEach { i ->
+                val entry = listArray.optJSONObject(i)
+                val title = entry?.optString("titulo") ?: entry?.optString("nome_filme") ?: ""
+                val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme") ?: ""
                 val url = "$mainUrl/a/${entry?.optString("generate_id")}"
-                items.add(
-                    newAnimeSearchResponse(title, url, TvType.Anime) {
-                        this.posterUrl = fixUrl(posterUrl)
+                
+                when (request.data) {
+                    "data_movies" -> {
+                        items.add(
+                            newMovieSearchResponse(title, url, TvType.Movie) {
+                                this.posterUrl = fixUrl(posterUrl)
+                            }
+                        )
                     }
-                )
-            }
-            if (items.isNotEmpty()) {
-                homepageLists.add(
-                    HomePageList(
-                        name = "Lançamentos",
-                        list = items,
-                        isHorizontalImages = false
-                    )
-                )
+                    else -> {
+                        items.add(
+                            newAnimeSearchResponse(title, url, TvType.Anime) {
+                                this.posterUrl = fixUrl(posterUrl)
+                            }
+                        )
+                    }
+                }
             }
         }
         
-        // Criando a lista de Animes em Alta
-        val animesArray = lists.optJSONArray("animes")
-        if (animesArray != null) {
-            val items = mutableListOf<SearchResponse>()
-            (0 until animesArray.length()).forEach { i ->
-                val entry = animesArray.optJSONObject(i)
-                val title = entry?.optString("titulo") ?: ""
-                val posterUrl = entry?.optString("poster") ?: ""
-                val url = "$mainUrl/a/${entry?.optString("generate_id")}"
-                items.add(
-                    newAnimeSearchResponse(title, url, TvType.Anime) {
-                        this.posterUrl = fixUrl(posterUrl)
-                    }
-                )
-            }
-            if (items.isNotEmpty()) {
-                homepageLists.add(
-                    HomePageList(
-                        name = "Animes em Alta",
-                        list = items,
-                        isHorizontalImages = false
-                    )
-                )
-            }
-        }
-        
-        // Criando a lista de Filmes
-        val moviesArray = lists.optJSONArray("movies")
-        if (moviesArray != null) {
-            val items = mutableListOf<SearchResponse>()
-            (0 until moviesArray.length()).forEach { i ->
-                val entry = moviesArray.optJSONObject(i)
-                val title = entry?.optString("nome_filme") ?: ""
-                val posterUrl = entry?.optString("capa_filme") ?: ""
-                val url = "$mainUrl/a/${entry?.optString("generate_id")}"
-                items.add(
-                    newMovieSearchResponse(title, url, TvType.Movie) {
-                        this.posterUrl = fixUrl(posterUrl)
-                    }
-                )
-            }
-            if (items.isNotEmpty()) {
-                homepageLists.add(
-                    HomePageList(
-                        name = "Filmes",
-                        list = items,
-                        isHorizontalImages = false
-                    )
-                )
-            }
-        }
-        
-        return HomePageResponse(homepageLists)
+        return newHomePageResponse(
+            list = HomePageList(
+                name = request.name,
+                list = items,
+                isHorizontalImages = false
+            ),
+            hasNext = false
+        )
     }
-             
-         
-               
+            
          
      override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
