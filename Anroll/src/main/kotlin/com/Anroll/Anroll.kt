@@ -27,7 +27,7 @@ class Anroll : MainAPI() {
         "data_movies" to "Filmes"
     )
                   
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+   override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return newHomePageResponse(request.name, emptyList())
@@ -49,58 +49,59 @@ class Anroll : MainAPI() {
                 // Variáveis que serão preenchidas com base na categoria
                 val title: String
                 val url: String
-                val posterUrl: String
                 val type: TvType
 
                 when (request.data) {
                     "data_releases" -> {
-                        // Lógica CORRETA para Lançamentos (episódios aninhados)
+                        // Lógica para Lançamentos (episódios aninhados)
                         val episode = entry?.optJSONObject("episode")
                         val anime = episode?.optJSONObject("anime")
                         title = anime?.optString("titulo") ?: ""
                         val generateId = episode?.optString("generate_id") ?: ""
                         url = "$mainUrl/e/$generateId"
-                        posterUrl = ""
                         type = TvType.Anime
+
+                        // Buscando a capa no HTML com base no título
+                        val posterUrl = document.select("h1:contains($title)").parents().select("img").attr("src")
+
+                        items.add(
+                            newAnimeSearchResponse(title, url, type) {
+                                if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
+                            }
+                        )
                     }
                     "data_animes" -> {
                         // Lógica para Animes em Alta (estrutura plana)
                         title = entry?.optString("titulo") ?: ""
                         val generateId = entry?.optString("generate_id") ?: ""
                         url = "$mainUrl/a/$generateId"
-                        posterUrl = entry?.optString("poster") ?: ""
                         type = TvType.Anime
+
+                        // Buscando a capa no HTML com base no título
+                        val posterUrl = document.select("div.itemlistanime:contains($title)").select("img").attr("src")
+
+                        items.add(
+                            newAnimeSearchResponse(title, url, type) {
+                                if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
+                            }
+                        )
                     }
                     "data_movies" -> {
                         // Lógica para Filmes (estrutura plana)
                         title = entry?.optString("nome_filme") ?: ""
                         val generateId = entry?.optString("generate_id") ?: ""
                         url = "$mainUrl/f/$generateId"
-                        posterUrl = entry?.optString("capa_filme") ?: ""
                         type = TvType.Movie
+
+                        // Buscando a capa no HTML com base no título
+                        val posterUrl = document.select("div.movielistitem:contains($title)").select("img").attr("src")
+
+                        items.add(
+                            newMovieSearchResponse(title, url, type) {
+                                if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
+                            }
+                        )
                     }
-                    else -> {
-                        // Lógica padrão (se nenhuma das categorias acima for encontrada)
-                        title = entry?.optString("titulo") ?: ""
-                        val generateId = entry?.optString("generate_id") ?: ""
-                        url = "$mainUrl/a/$generateId"
-                        posterUrl = entry?.optString("poster") ?: ""
-                        type = TvType.Anime
-                    }
-                }
-                
-                if (type == TvType.Movie) {
-                    items.add(
-                        newMovieSearchResponse(title, url, type) {
-                            if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
-                        }
-                    )
-                } else {
-                    items.add(
-                        newAnimeSearchResponse(title, url, type) {
-                            if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
-                        }
-                    )
                 }
             }
         }
