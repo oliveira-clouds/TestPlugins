@@ -47,30 +47,28 @@ class Anroll : MainAPI() {
                 val entry = listArray.optJSONObject(i)
                 val title = entry?.optString("titulo") ?: entry?.optString("nome_filme") ?: ""
                 val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme") ?: ""
-                val generateId = entry?.optString("generate_id") ?: ""
-
-                // Construindo a URL com base na categoria
+                
+                // Usando o generate_id como padrão e o slug como fallback
+                val generateId = entry?.optString("generate_id") ?: entry?.optString("slug_filme") ?: entry?.optString("slug_anime") ?: ""
+                
                 val url = when (request.data) {
                     "data_releases" -> "$mainUrl/e/$generateId"
                     "data_movies" -> "$mainUrl/f/$generateId"
                     else -> "$mainUrl/a/$generateId"
                 }
 
-                when (request.data) {
-                    "data_movies" -> {
-                        items.add(
-                            newMovieSearchResponse(title, url, TvType.Movie) {
-                                this.posterUrl = fixUrl(posterUrl)
-                            }
-                        )
-                    }
-                    else -> {
-                        items.add(
-                            newAnimeSearchResponse(title, url, TvType.Anime) {
-                                this.posterUrl = fixUrl(posterUrl)
-                            }
-                        )
-                    }
+                if (request.data == "data_movies") {
+                    items.add(
+                        newMovieSearchResponse(title, url, TvType.Movie) {
+                            this.posterUrl = fixUrl(posterUrl)
+                        }
+                    )
+                } else {
+                    items.add(
+                        newAnimeSearchResponse(title, url, TvType.Anime) {
+                            this.posterUrl = fixUrl(posterUrl)
+                        }
+                    )
                 }
             }
         }
