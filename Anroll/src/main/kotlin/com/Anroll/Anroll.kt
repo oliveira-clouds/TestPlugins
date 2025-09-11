@@ -45,46 +45,54 @@ class Anroll : MainAPI() {
         if (listArray != null) {
             (0 until listArray.length()).forEach { i ->
                 val entry = listArray.optJSONObject(i)
-                
-                // Variáveis que serão preenchidas com base na categoria
+
                 val title: String
                 val url: String
                 val type: TvType
                 val generateId: String
+                val posterUrl: String
 
                 when (request.data) {
                     "data_releases" -> {
                         val episode = entry?.optJSONObject("episode")
                         val anime = episode?.optJSONObject("anime")
-                        title = anime?.optString("titulo") ?: ""
+                        val epNumber = episode?.optString("n_episodio") ?: ""
+                        title = "${anime?.optString("titulo") ?: ""} Episódio $epNumber"
                         generateId = episode?.optString("generate_id") ?: ""
                         url = "$mainUrl/e/$generateId"
                         type = TvType.Anime
+
+                        // Buscando a capa no HTML com base no ID
+                        posterUrl = document.select("a[href*=${anime?.optString("slug_serie")}]").select("img").attr("src")
                     }
                     "data_animes" -> {
                         title = entry?.optString("titulo") ?: ""
                         generateId = entry?.optString("generate_id") ?: ""
                         url = "$mainUrl/a/$generateId"
                         type = TvType.Anime
+                        
+                        // Buscando a capa no HTML com base no ID
+                        posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
                     }
                     "data_movies" -> {
                         title = entry?.optString("nome_filme") ?: ""
                         generateId = entry?.optString("generate_id") ?: ""
                         url = "$mainUrl/f/$generateId"
                         type = TvType.Movie
+                        
+                        // Buscando a capa no HTML com base no ID
+                        posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
                     }
                     else -> {
                         title = ""
                         generateId = ""
                         url = ""
                         type = TvType.Anime
+                        posterUrl = ""
                     }
                 }
                 
                 if (title.isNotEmpty() && generateId.isNotEmpty()) {
-                    // Agora, a busca pela capa é feita de forma segura
-                    val posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
-
                     if (type == TvType.Movie) {
                         items.add(
                             newMovieSearchResponse(title, url, type) {
@@ -106,7 +114,7 @@ class Anroll : MainAPI() {
             list = HomePageList(
                 name = request.name,
                 list = items,
-                isHorizontalImages = false
+                isHorizontalImages = request.data == "data_releases"
             ),
             hasNext = false
         )
@@ -141,7 +149,7 @@ class Anroll : MainAPI() {
             }
         }
     }
-override suspend fun load(url: String): LoadResponse? {
+ override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return null
@@ -149,49 +157,87 @@ override suspend fun load(url: String): LoadResponse? {
         val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
         val jsonObject = JSONObject(scriptContent)
         val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
-        val animeData = pageProps?.optJSONObject("data")
-            ?: pageProps?.optJSONObject("anime")
+        
+        val isEpisode = url.contains("/e/")
+        val isMovie = url.contains("/f/")
+        val isSeries = url.contains("/a/")
 
-        val title = animeData?.optString("titulo") ?: return null
-        val poster = animeData.optString("poster")
-        val plot = animeData.optString("sinopse")
-        val idSerie = animeData?.optInt("id_serie", 0)
-
-        val episodes = mutableListOf<Episode>()
-
-        if (idSerie != null && idSerie != 0) {
-            val episodesUrl = "https://apiv3-prd.anroll.net/animes/$idSerie/episodes"
+        if (isEpisode) {
+            val animeData = pageProps?.optJSONObject("data")?.optJSONObject("episode")
+            val title = animeData?.optString("n_episodio")?.let { "Episódio $it" } ?: ""
+            val plot = animeData?.optString("sinopse") ?: ""
             
-            try {
-                val episodesResponse = app.get(episodesUrl)
-                val episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
+            return newAnimeLoadResponse(title, url, TvType.Anime) {
+                this.plot = plot
+                addEpisodes(
+                    DubStatus.Subbed,
+                    listOf(newEpisode(url) {
+                        name = title
+                        episode = animeData?.optString("n_episodio")?.toIntOrNull()
+                    })
+                )
+            }
+
+        } else if (isMovie) {
+            val movieData = pageProps?.optJSONObject("data")?.optJSONObject("filme")
+            val title = movieData?.optString("nome_filme") ?: return null
+            val poster = movieData.optString("capa_filme")
+            val plot = movieData.optString("sinopse_filme")
+            val movieUrl = "$mainUrl/f/${movieData.optString("generate_id")}"
+            
+            return newMovieLoadResponse(title, movieUrl, TvType.Movie) {
+                this.posterUrl = poster
+                this.plot = plot
+                addEpisodes(
+                    DubStatus.Subbed,
+                    listOf(newEpisode(movieUrl) {
+                        name = "Filme"
+                        episode = 1
+                    })
+                )
+            }
+        
+        } else if (isSeries) {
+            val animeData = pageProps?.optJSONObject("data")?.optJSONObject("anime")
+            val title = animeData?.optString("titulo") ?: return null
+            val poster = animeData.optString("poster")
+            val plot = animeData.optString("sinopse")
+            val idSerie = animeData?.optInt("id_serie", 0)
+            
+            val episodes = mutableListOf<Episode>()
+            if (idSerie != null && idSerie != 0) {
+                val episodesUrl = "https://apiv3-prd.anroll.net/animes/$idSerie/episodes"
                 
-                if (episodesJsonArray != null) {
-                    (0 until episodesJsonArray.length()).mapNotNull { i ->
-                        val ep = episodesJsonArray.optJSONObject(i)
-                        val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
-                        val epGenId = ep?.optString("generate_id")
-                        
-                        if (epGenId != null && epNumber != null) {
-                            episodes.add(
-                                newEpisode("$mainUrl/e/$epGenId") {
-                                    name = "Episódio $epNumber"
-                                    episode = epNumber
-                                }
-                            )
+                try {
+                    val episodesResponse = app.get(episodesUrl)
+                    val episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
+                    
+                    if (episodesJsonArray != null) {
+                        (0 until episodesJsonArray.length()).mapNotNull { i ->
+                            val ep = episodesJsonArray.optJSONObject(i)
+                            val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
+                            val epGenId = ep?.optString("generate_id")
+                            
+                            if (epGenId != null && epNumber != null) {
+                                episodes.add(
+                                    newEpisode("$mainUrl/e/$epGenId") {
+                                        name = "Episódio $epNumber"
+                                        episode = epNumber
+                                    }
+                                )
+                            }
                         }
                     }
-                }
-            } catch (e: Exception) {
-                // Se a API retornar um erro, o código simplesmente não adiciona os episódios.
+                } catch (e: Exception) {}
+            }
+            
+            return newAnimeLoadResponse(title, url, TvType.Anime) {
+                this.posterUrl = poster
+                this.plot = plot
+                addEpisodes(DubStatus.Subbed, episodes.reversed())
             }
         }
-
-        return newAnimeLoadResponse(title, url, TvType.Anime) {
-            this.posterUrl = poster
-            this.plot = plot
-            addEpisodes(DubStatus.Subbed, episodes.reversed())
-        }
+        return null
     }
  
 override suspend fun loadLinks(
