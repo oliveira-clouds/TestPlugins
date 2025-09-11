@@ -27,7 +27,7 @@ class Anroll : MainAPI() {
         "data_movies" to "Filmes"
     )
                   
-     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return newHomePageResponse(request.name, emptyList())
@@ -47,8 +47,15 @@ class Anroll : MainAPI() {
                 val entry = listArray.optJSONObject(i)
                 val title = entry?.optString("titulo") ?: entry?.optString("nome_filme") ?: ""
                 val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme") ?: ""
-                val url = "$mainUrl/a/${entry?.optString("generate_id")}"
-                
+                val generateId = entry?.optString("generate_id") ?: ""
+
+                // Construindo a URL com base na categoria
+                val url = when (request.data) {
+                    "data_releases" -> "$mainUrl/e/$generateId"
+                    "data_movies" -> "$mainUrl/f/$generateId"
+                    else -> "$mainUrl/a/$generateId"
+                }
+
                 when (request.data) {
                     "data_movies" -> {
                         items.add(
