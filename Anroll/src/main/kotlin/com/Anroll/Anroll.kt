@@ -45,28 +45,60 @@ class Anroll : MainAPI() {
         if (listArray != null) {
             (0 until listArray.length()).forEach { i ->
                 val entry = listArray.optJSONObject(i)
-                val title = entry?.optString("titulo") ?: entry?.optString("nome_filme") ?: ""
-                val posterUrl = entry?.optString("poster") ?: entry?.optString("capa_filme") ?: ""
                 
-                // Usando o generate_id como padrão e o slug como fallback
-                val generateId = entry?.optString("generate_id") ?: entry?.optString("slug_filme") ?: entry?.optString("slug_anime") ?: ""
-                
-                val url = when (request.data) {
-                    "data_releases" -> "$mainUrl/e/$generateId"
-                    "data_movies" -> "$mainUrl/f/$generateId"
-                    else -> "$mainUrl/a/$generateId"
-                }
+                // Variáveis que serão preenchidas com base na categoria
+                val title: String
+                val url: String
+                val posterUrl: String
+                val type: TvType
 
-                if (request.data == "data_movies") {
+                when (request.data) {
+                    "data_releases" -> {
+                        // Lógica CORRETA para Lançamentos (episódios aninhados)
+                        val episode = entry?.optJSONObject("episode")
+                        val anime = episode?.optJSONObject("anime")
+                        title = anime?.optString("titulo") ?: ""
+                        val generateId = episode?.optString("generate_id") ?: ""
+                        url = "$mainUrl/e/$generateId"
+                        posterUrl = "" // A lista de releases não tem URL de pôster, então a deixamos vazia
+                        type = TvType.Anime
+                    }
+                    "data_animes" -> {
+                        // Lógica para Animes em Alta (estrutura plana)
+                        title = entry?.optString("titulo") ?: ""
+                        val generateId = entry?.optString("generate_id") ?: ""
+                        url = "$mainUrl/a/$generateId"
+                        posterUrl = entry?.optString("poster") ?: ""
+                        type = TvType.Anime
+                    }
+                    "data_movies" -> {
+                        // Lógica para Filmes (estrutura plana)
+                        title = entry?.optString("nome_filme") ?: ""
+                        val generateId = entry?.optString("generate_id") ?: ""
+                        url = "$mainUrl/f/$generateId"
+                        posterUrl = entry?.optString("capa_filme") ?: ""
+                        type = TvType.Movie
+                    }
+                    else -> {
+                        // Lógica padrão (se nenhuma das categorias acima for encontrada)
+                        title = entry?.optString("titulo") ?: ""
+                        val generateId = entry?.optString("generate_id") ?: ""
+                        url = "$mainUrl/a/$generateId"
+                        posterUrl = entry?.optString("poster") ?: ""
+                        type = TvType.Anime
+                    }
+                }
+                
+                if (type == TvType.Movie) {
                     items.add(
-                        newMovieSearchResponse(title, url, TvType.Movie) {
-                            this.posterUrl = fixUrl(posterUrl)
+                        newMovieSearchResponse(title, url, type) {
+                            if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
                         }
                     )
                 } else {
                     items.add(
-                        newAnimeSearchResponse(title, url, TvType.Anime) {
-                            this.posterUrl = fixUrl(posterUrl)
+                        newAnimeSearchResponse(title, url, type) {
+                            if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
                         }
                     )
                 }
@@ -82,7 +114,16 @@ class Anroll : MainAPI() {
             hasNext = false
         )
     }
-            
+        
+        return newHomePageResponse(
+            list = HomePageList(
+                name = request.name,
+                list = items,
+                isHorizontalImages = false
+            ),
+            hasNext = false
+        )
+    }
          
      override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
