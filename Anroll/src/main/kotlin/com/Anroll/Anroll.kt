@@ -41,7 +41,7 @@ class Anroll : MainAPI() {
 
         val items = mutableListOf<SearchResponse>()
         val listArray = data.optJSONArray(request.data)
-        
+
         if (listArray != null) {
             (0 until listArray.length()).forEach { i ->
                 val entry = listArray.optJSONObject(i)
@@ -50,54 +50,50 @@ class Anroll : MainAPI() {
                 val title: String
                 val url: String
                 val type: TvType
+                val generateId: String
 
                 when (request.data) {
                     "data_releases" -> {
-                        // Lógica para Lançamentos (episódios aninhados)
                         val episode = entry?.optJSONObject("episode")
                         val anime = episode?.optJSONObject("anime")
                         title = anime?.optString("titulo") ?: ""
-                        val generateId = episode?.optString("generate_id") ?: ""
+                        generateId = episode?.optString("generate_id") ?: ""
                         url = "$mainUrl/e/$generateId"
                         type = TvType.Anime
-
-                        // Buscando a capa no HTML com base no título
-                        val posterUrl = document.select("h1:contains($title)").parents().select("img").attr("src")
-
-                        items.add(
-                            newAnimeSearchResponse(title, url, type) {
-                                if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
-                            }
-                        )
                     }
                     "data_animes" -> {
-                        // Lógica para Animes em Alta (estrutura plana)
                         title = entry?.optString("titulo") ?: ""
-                        val generateId = entry?.optString("generate_id") ?: ""
+                        generateId = entry?.optString("generate_id") ?: ""
                         url = "$mainUrl/a/$generateId"
                         type = TvType.Anime
+                    }
+                    "data_movies" -> {
+                        title = entry?.optString("nome_filme") ?: ""
+                        generateId = entry?.optString("generate_id") ?: ""
+                        url = "$mainUrl/f/$generateId"
+                        type = TvType.Movie
+                    }
+                    else -> {
+                        title = ""
+                        generateId = ""
+                        url = ""
+                        type = TvType.Anime
+                    }
+                }
+                
+                if (title.isNotEmpty() && generateId.isNotEmpty()) {
+                    // Agora, a busca pela capa é feita de forma segura
+                    val posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
 
-                        // Buscando a capa no HTML com base no título
-                        val posterUrl = document.select("div.itemlistanime:contains($title)").select("img").attr("src")
-
+                    if (type == TvType.Movie) {
                         items.add(
-                            newAnimeSearchResponse(title, url, type) {
+                            newMovieSearchResponse(title, url, type) {
                                 if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
                             }
                         )
-                    }
-                    "data_movies" -> {
-                        // Lógica para Filmes (estrutura plana)
-                        title = entry?.optString("nome_filme") ?: ""
-                        val generateId = entry?.optString("generate_id") ?: ""
-                        url = "$mainUrl/f/$generateId"
-                        type = TvType.Movie
-
-                        // Buscando a capa no HTML com base no título
-                        val posterUrl = document.select("div.movielistitem:contains($title)").select("img").attr("src")
-
+                    } else {
                         items.add(
-                            newMovieSearchResponse(title, url, type) {
+                            newAnimeSearchResponse(title, url, type) {
                                 if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
                             }
                         )
@@ -114,7 +110,8 @@ class Anroll : MainAPI() {
             ),
             hasNext = false
         )
-    }    
+    }
+   
      override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
         val response = app.get(searchUrl)
