@@ -151,24 +151,24 @@ override suspend fun load(url: String): LoadResponse? {
         val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
         val jsonObject = JSONObject(scriptContent)
         val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
-
+        
         val isEpisode = url.contains("/e/")
         val isMovie = url.contains("/f/")
         val isSeries = url.contains("/a/")
 
         if (isEpisode) {
-            val animeData = pageProps?.optJSONObject("data")?.optJSONObject("episode")
-            val title = animeData?.optString("n_episodio")?.let { "Episódio $it" } ?: ""
-            val plot = animeData?.optString("sinopse") ?: ""
-            val episodeUrl = "$mainUrl/e/${animeData?.optString("generate_id")}"
-            
+            val episodeData = pageProps?.optJSONObject("data")?.optJSONObject("episode")
+            val title = "Episódio ${episodeData?.optString("n_episodio") ?: ""}"
+            val plot = episodeData?.optString("sinopse") ?: ""
+            val episodeUrl = "$mainUrl/e/${episodeData?.optString("generate_id")}"
+
             return newAnimeLoadResponse(title, url, TvType.Anime) {
                 this.plot = plot
                 addEpisodes(
                     DubStatus.Subbed,
                     listOf(newEpisode(episodeUrl) {
                         name = title
-                        episode = animeData?.optString("n_episodio")?.toIntOrNull()
+                        episode = episodeData?.optString("n_episodio")?.toIntOrNull()
                     })
                 )
             }
@@ -181,7 +181,7 @@ override suspend fun load(url: String): LoadResponse? {
             val movieUrl = "$mainUrl/f/${movieData.optString("generate_id")}"
             
             return newMovieLoadResponse(title, url, TvType.Movie) {
-                this.posterUrl = poster
+                this.posterUrl = fixUrl(poster)
                 this.plot = plot
                 addEpisodes(
                     DubStatus.Subbed,
