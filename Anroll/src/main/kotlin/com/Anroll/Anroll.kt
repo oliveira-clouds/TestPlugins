@@ -143,7 +143,7 @@ class Anroll : MainAPI() {
         }
     }
      
-override suspend fun load(url: String): LoadResponse? {
+    override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return null
@@ -161,8 +161,8 @@ override suspend fun load(url: String): LoadResponse? {
             val title = "Episódio ${episodeData?.optString("n_episodio") ?: ""}"
             val plot = episodeData?.optString("sinopse") ?: ""
             val episodeUrl = "$mainUrl/e/${episodeData?.optString("generate_id")}"
-
-            return newAnimeLoadResponse(title, url, TvType.Anime) {
+            
+            return newAnimeLoadResponse(title, episodeUrl, TvType.Anime) {
                 this.plot = plot
                 addEpisodes(
                     DubStatus.Subbed,
@@ -180,7 +180,7 @@ override suspend fun load(url: String): LoadResponse? {
             val plot = movieData.optString("sinopse_filme")
             val movieUrl = "$mainUrl/f/${movieData.optString("generate_id")}"
             
-            return newMovieLoadResponse(title, url, TvType.Movie) {
+            return newMovieLoadResponse(title, movieUrl, TvType.Movie) {
                 this.posterUrl = fixUrl(poster)
                 this.plot = plot
                 addEpisodes(
