@@ -143,7 +143,7 @@ class Anroll : MainAPI() {
         }
     }
      
-   override suspend fun load(url: String): LoadResponse? {
+  override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return null
@@ -175,20 +175,8 @@ class Anroll : MainAPI() {
             }
 
         } else if (isMovie) {
-            val movieData = pageProps?.optJSONObject("data")?.optJSONObject("filme")
-            val title = movieData?.optString("nome_filme") ?: return null
-            val poster = movieData.optString("capa_filme")
-            val plot = movieData.optString("sinopse_filme")
-            val movieUrl = "$mainUrl/f/${movieData.optString("generate_id")}"
-            
-            return newMovieLoadResponse(title, url, TvType.Movie) {
-                this.posterUrl = fixUrl(poster)
-                this.plot = plot
-                this.episodes = listOf(newEpisode(movieUrl) {
-                    name = "Filme"
-                    episode = 1
-                })
-            }
+            // Este bloco foi removido conforme sua solicitação.
+            return null
         
         } else if (isSeries) {
             val animeData = pageProps?.optJSONObject("data")?.optJSONObject("anime")
