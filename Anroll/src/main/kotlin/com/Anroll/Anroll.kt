@@ -158,16 +158,17 @@ class Anroll : MainAPI() {
 
         if (isEpisode) {
             val episodeData = pageProps?.optJSONObject("data")?.optJSONObject("episode")
-            val title = "Episódio ${episodeData?.optString("n_episodio") ?: ""}"
-            val plot = episodeData?.optString("sinopse") ?: ""
+            val anime = episodeData?.optJSONObject("anime")
+            val title = anime?.optString("titulo") ?: "Episódio ${episodeData?.optString("n_episodio") ?: ""}"
+            val plot = anime?.optString("sinopse") ?: ""
             val episodeUrl = "$mainUrl/e/${episodeData?.optString("generate_id")}"
             
-            return newAnimeLoadResponse(title, episodeUrl, TvType.Anime) {
+            return newAnimeLoadResponse(title, url, TvType.Anime) {
                 this.plot = plot
                 addEpisodes(
                     DubStatus.Subbed,
                     listOf(newEpisode(episodeUrl) {
-                        name = title
+                        name = "Episódio ${episodeData?.optString("n_episodio") ?: ""}"
                         episode = episodeData?.optString("n_episodio")?.toIntOrNull()
                     })
                 )
@@ -180,7 +181,7 @@ class Anroll : MainAPI() {
             val plot = movieData.optString("sinopse_filme")
             val movieUrl = "$mainUrl/f/${movieData.optString("generate_id")}"
             
-            return newMovieLoadResponse(title, movieUrl, TvType.Movie) {
+            return newMovieLoadResponse(title, url, TvType.Movie) {
                 this.posterUrl = fixUrl(poster)
                 this.plot = plot
                 addEpisodes(
