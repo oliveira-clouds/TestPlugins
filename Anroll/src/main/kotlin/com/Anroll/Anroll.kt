@@ -143,7 +143,7 @@ class Anroll : MainAPI() {
         }
     }
      
-    override suspend fun load(url: String): LoadResponse? {
+   override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             ?: return null
@@ -184,13 +184,10 @@ class Anroll : MainAPI() {
             return newMovieLoadResponse(title, url, TvType.Movie) {
                 this.posterUrl = fixUrl(poster)
                 this.plot = plot
-                addEpisodes(
-                    DubStatus.Subbed,
-                    listOf(newEpisode(movieUrl) {
-                        name = "Filme"
-                        episode = 1
-                    })
-                )
+                this.episodes = listOf(newEpisode(movieUrl) {
+                    name = "Filme"
+                    episode = 1
+                })
             }
         
         } else if (isSeries) {
