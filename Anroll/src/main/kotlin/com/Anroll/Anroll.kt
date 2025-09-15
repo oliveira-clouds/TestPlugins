@@ -22,83 +22,87 @@ class Anroll : MainAPI() {
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime, TvType.Movie)
     
          override val mainPage = mainPageOf(
-        "data_releases" to "Lançamentos",
+        "lancamentos" to "Últimos Lançamentos",
+        "adicionados" to "Últimos Animes Adicionados",
         "data_animes" to "Animes em Alta",
         "data_movies" to "Filmes"
     )
-                  
-   override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = app.get(mainUrl).document
-        val scriptTag = document.selectFirst("script#__NEXT_DATA__")
-            ?: return newHomePageResponse(request.name, emptyList())
-
-        val scriptContent = scriptTag.data()
-        val jsonObject = JSONObject(scriptContent)
-        val data = jsonObject.optJSONObject("props")
-            ?.optJSONObject("pageProps")
-            ?.optJSONObject("data")
-            ?: return newHomePageResponse(request.name, emptyList())
-
+    
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = mutableListOf<SearchResponse>()
-        val listArray = data.optJSONArray(request.data)
+        var hasNext = false
 
-        if (listArray != null) {
-            (0 until listArray.length()).forEach { i ->
-                val entry = listArray.optJSONObject(i)
-                
-                val title: String
-                val url: String
-                val type: TvType
-                val generateId: String
-                val posterUrl: String
-
-                when (request.data) {
-                    "data_releases" -> {
-                        val episode = entry?.optJSONObject("episode")
-                        val anime = episode?.optJSONObject("anime")
-                        val epNumber = episode?.optString("n_episodio") ?: ""
-                        title = "${anime?.optString("titulo") ?: ""} Episódio $epNumber"
-                        generateId = episode?.optString("generate_id") ?: ""
-                        url = "$mainUrl/e/$generateId"
-                        type = TvType.Anime
-                        posterUrl = document.select("a[href*=${anime?.optString("slug_serie")}]").select("img").attr("src")
-                    }
-                    "data_animes" -> {
-                        title = entry?.optString("titulo") ?: ""
-                        generateId = entry?.optString("generate_id") ?: ""
-                        url = "$mainUrl/a/$generateId"
-                        type = TvType.Anime
-                        posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
-                    }
-                    "data_movies" -> {
-                        title = entry?.optString("nome_filme") ?: ""
-                        generateId = entry?.optString("generate_id") ?: ""
-                        url = "$mainUrl/f/$generateId"
-                        type = TvType.Movie
-                        posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
-                    }
-                    else -> {
-                        title = ""
-                        generateId = ""
-                        url = ""
-                        type = TvType.Anime
-                        posterUrl = ""
-                    }
+        when (request.data) {
+            "lancamentos" -> {
+                val document = app.get("$mainUrl/lancamentos").document
+                document.select("ul.UVrQY li.release-item").forEach { element ->
+                    parseLancamentoCard(element)?.let { items.add(it) }
                 }
-                
-                if (title.isNotEmpty() && generateId.isNotEmpty()) {
-                    if (type == TvType.Movie) {
-                        items.add(
-                            newMovieSearchResponse(title, url, type) {
-                                if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
+            }
+            "adicionados" -> {
+                val document = app.get(mainUrl).document
+                document.select("ul.ctmcR li.movielistitem").forEach { element ->
+                    parseAdicionadoCard(element)?.let { items.add(it) }
+                }
+            }
+            "data_animes", "data_movies" -> {
+                val document = app.get(mainUrl).document
+                val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+                    ?: return newHomePageResponse(request.name, emptyList())
+                val scriptContent = scriptTag.data()
+                val jsonObject = JSONObject(scriptContent)
+                val data = jsonObject.optJSONObject("props")
+                    ?.optJSONObject("pageProps")
+                    ?.optJSONObject("data")
+                    ?: return newHomePageResponse(request.name, emptyList())
+                val listArray = data.optJSONArray(request.data)
+                if (listArray != null) {
+                    (0 until listArray.length()).forEach { i ->
+                        val entry = listArray.optJSONObject(i)
+                        val title: String
+                        val url: String
+                        val type: TvType
+                        val generateId: String
+                        val posterUrl: String
+
+                        when (request.data) {
+                            "data_animes" -> {
+                                title = entry?.optString("titulo") ?: ""
+                                generateId = entry?.optString("generate_id") ?: ""
+                                url = "$mainUrl/a/$generateId"
+                                type = TvType.Anime
+                                posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
                             }
-                        )
-                    } else {
-                        items.add(
-                            newAnimeSearchResponse(title, url, type) {
-                                if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
+                            "data_movies" -> {
+                                title = entry?.optString("nome_filme") ?: ""
+                                generateId = entry?.optString("generate_id") ?: ""
+                                url = "$mainUrl/f/$generateId"
+                                type = TvType.Movie
+                                posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
                             }
-                        )
+                            else -> {
+                                title = ""
+                                generateId = ""
+                                url = ""
+                                type = TvType.Anime
+                                posterUrl = ""
+                            }
+                        }
+                        if (title.isNotEmpty() && generateId.isNotEmpty()) {
+                            if (type == TvType.Movie) {
+                                items.add(
+                                    newMovieSearchResponse(title, url, type) {
+                                        if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
+                                    }
+                                )
+                            } else {
+                                items.add(
+                                    newAnimeSearchResponse(title, url, type) {
+                                        if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -108,11 +112,40 @@ class Anroll : MainAPI() {
             list = HomePageList(
                 name = request.name,
                 list = items,
-                isHorizontalImages = request.data == "data_releases"
+                isHorizontalImages = request.data == "lancamentos"
             ),
             hasNext = false
         )
     }
+
+    private fun parseLancamentoCard(element: Element): SearchResponse? {
+        val link = element.selectFirst("a[href]") ?: return null
+        val href = fixUrl(link.attr("href"))
+        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
+        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
+
+        val episodeText = element.selectFirst("span.episode-badge b")?.text()
+        val episode = episodeText?.toIntOrNull() ?: 1
+
+        val isDub = element.selectFirst("div#labels-column2 div.imwHAL") != null
+
+        return newAnimeSearchResponse(title, href, TvType.Anime) {
+            this.posterUrl = posterUrl
+            this.addDubStatus(isDub, episode)
+        }
+    }
+
+    private fun parseAdicionadoCard(element: Element): SearchResponse? {
+        val link = element.selectFirst("a[href]") ?: return null
+        val href = fixUrl(link.attr("href"))
+        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
+        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
+
+        return newAnimeSearchResponse(title, href, TvType.Anime) {
+            this.posterUrl = posterUrl
+        }
+    }
+    
      override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
         val response = app.get(searchUrl)
