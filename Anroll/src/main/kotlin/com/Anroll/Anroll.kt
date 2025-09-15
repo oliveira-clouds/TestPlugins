@@ -201,31 +201,12 @@ class Anroll : MainAPI() {
                 addEpisodes(DubStatus.Subbed, episodes.reversed())
             }
         } else if (isMovie) {
-            val movieData = app.get(url).document.selectFirst("script#__NEXT_DATA__")
-                ?.data()?.let { JSONObject(it) }
-                ?.optJSONObject("props")?.optJSONObject("pageProps")
-                ?.optJSONObject("data")?.optJSONObject("filme") ?: return null
-            
-            val title = movieData.optString("nome_filme")
-            val poster = movieData.optString("capa_filme")
-            val plot = movieData.optString("sinopse_filme")
-            val movieUrl = "$mainUrl/f/${movieData.optString("generate_id")}"
-            
-            return newMovieLoadResponse(title, url, TvType.Movie) {
-                this.posterUrl = fixUrl(poster)
-                this.plot = plot
-                addEpisodes(
-                    DubStatus.Subbed,
-                    listOf(newEpisode(movieUrl) {
-                        name = "Filme"
-                        episode = 1
-                    })
-                )
-            }
+           return null
         }
 
         return null
     }
+
  
 override suspend fun loadLinks(
     data: String,
