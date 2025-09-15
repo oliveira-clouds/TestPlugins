@@ -21,9 +21,8 @@ class Anroll : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime, TvType.Movie)
     
-         override val mainPage = mainPageOf(
+        override val mainPage = mainPageOf(
         "lancamentos" to "Últimos Lançamentos",
-        "adicionados" to "Últimos Animes Adicionados",
         "data_animes" to "Animes em Alta",
         "data_movies" to "Filmes"
     )
@@ -37,12 +36,6 @@ class Anroll : MainAPI() {
                 val document = app.get("$mainUrl/lancamentos").document
                 document.select("ul.UVrQY li.release-item").forEach { element ->
                     parseLancamentoCard(element)?.let { items.add(it) }
-                }
-            }
-            "adicionados" -> {
-                val document = app.get(mainUrl).document
-                document.select("ul.ctmcR li.movielistitem").forEach { element ->
-                    parseAdicionadoCard(element)?.let { items.add(it) }
                 }
             }
             "data_animes", "data_movies" -> {
@@ -78,7 +71,8 @@ class Anroll : MainAPI() {
                                 generateId = entry?.optString("generate_id") ?: ""
                                 url = "$mainUrl/f/$generateId"
                                 type = TvType.Movie
-                                posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
+                                // AQUI ESTÁ A CORREÇÃO: Pega a capa diretamente do JSON
+                                posterUrl = entry.optString("capa_filme")
                             }
                             else -> {
                                 title = ""
