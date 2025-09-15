@@ -272,7 +272,7 @@ class Anroll : MainAPI() {
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = poster
                 this.plot = plot
-                this.set= episodes
+                this.episodes = episodes
 
             }
         }
