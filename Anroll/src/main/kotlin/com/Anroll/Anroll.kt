@@ -239,7 +239,7 @@ class Anroll : MainAPI() {
             }
 
             return newAnimeLoadResponse(title, url, TvType.Anime) {
-                val htmlPoster = document.selectFirst("div.info-wrapper img")?.attr("src")?.let { fixUrlNull(it) }
+                val htmlPoster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
                 this.posterUrl = if (poster.isNotBlank()) poster else htmlPoster
                 this.plot = plot
                 addEpisodes(DubStatus.Subbed, episodes.reversed())
