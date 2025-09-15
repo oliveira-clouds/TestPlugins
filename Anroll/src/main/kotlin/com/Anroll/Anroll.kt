@@ -170,81 +170,60 @@ class Anroll : MainAPI() {
         }
     }
      
-  override suspend fun load(url: String): LoadResponse? {
+   override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
-        val scriptTag = document.selectFirst("script#__NEXT_DATA__")
-            ?: return null
-
-        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
-        val jsonObject = JSONObject(scriptContent)
-        val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
         
         val isEpisode = url.contains("/e/")
         val isMovie = url.contains("/f/")
         val isSeries = url.contains("/a/")
 
-        if (isEpisode) {
-            val episodeData = pageProps?.optJSONObject("data")?.optJSONObject("episode")
-            val anime = episodeData?.optJSONObject("anime")
-            val title = anime?.optString("titulo") ?: "Episódio ${episodeData?.optString("n_episodio") ?: ""}"
-            val plot = anime?.optString("sinopse") ?: ""
-            val episodeUrl = "$mainUrl/e/${episodeData?.optString("generate_id")}"
-            
-            return newAnimeLoadResponse(title, url, TvType.Anime) {
-                this.plot = plot
-                addEpisodes(
-                    DubStatus.Subbed,
-                    listOf(newEpisode(episodeUrl) {
-                        name = "Episódio ${episodeData?.optString("n_episodio") ?: ""}"
-                        episode = episodeData?.optString("n_episodio")?.toIntOrNull()
-                    })
-                )
+        if (isEpisode || isSeries) {
+            val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
+            val title = titleElement.text().trim()
+
+            val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
+            val plot = document.selectFirst("div.sinopse")?.text()
+
+            val episodes = document.select("div.epcontrol a").mapNotNull { epElement ->
+                val epUrl = fixUrl(epElement.attr("href"))
+                val epName = epElement.text().trim()
+                val epNumber = epName.split(" ").lastOrNull()?.toIntOrNull()
+
+                newEpisode(epUrl) {
+                    this.name = epName
+                    this.episode = epNumber
+                }
             }
 
-        } else if (isMovie) {
-            // Este bloco foi removido conforme sua solicitação.
-            return null
-        
-        } else if (isSeries) {
-            val animeData = pageProps?.optJSONObject("data")?.optJSONObject("anime")
-            val title = animeData?.optString("titulo") ?: return null
-            val poster = animeData.optString("poster")
-            val plot = animeData.optString("sinopse")
-            val idSerie = animeData?.optInt("id_serie", 0)
-            
-            val episodes = mutableListOf<Episode>()
-            if (idSerie != null && idSerie != 0) {
-                val episodesUrl = "https://apiv3-prd.anroll.net/animes/$idSerie/episodes"
-                
-                try {
-                    val episodesResponse = app.get(episodesUrl)
-                    val episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
-                    
-                    if (episodesJsonArray != null) {
-                        (0 until episodesJsonArray.length()).mapNotNull { i ->
-                            val ep = episodesJsonArray.optJSONObject(i)
-                            val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
-                            val epGenId = ep?.optString("generate_id")
-                            
-                            if (epGenId != null && epNumber != null) {
-                                episodes.add(
-                                    newEpisode("$mainUrl/e/$epGenId") {
-                                        name = "Episódio $epNumber"
-                                        episode = epNumber
-                                    }
-                                )
-                            }
-                        }
-                    }
-                } catch (e: Exception) {}
-            }
-            
             return newAnimeLoadResponse(title, url, TvType.Anime) {
                 this.posterUrl = poster
                 this.plot = plot
                 addEpisodes(DubStatus.Subbed, episodes.reversed())
             }
+        } else if (isMovie) {
+            val movieData = app.get(url).document.selectFirst("script#__NEXT_DATA__")
+                ?.data()?.let { JSONObject(it) }
+                ?.optJSONObject("props")?.optJSONObject("pageProps")
+                ?.optJSONObject("data")?.optJSONObject("filme") ?: return null
+            
+            val title = movieData.optString("nome_filme")
+            val poster = movieData.optString("capa_filme")
+            val plot = movieData.optString("sinopse_filme")
+            val movieUrl = "$mainUrl/f/${movieData.optString("generate_id")}"
+            
+            return newMovieLoadResponse(title, url, TvType.Movie) {
+                this.posterUrl = fixUrl(poster)
+                this.plot = plot
+                addEpisodes(
+                    DubStatus.Subbed,
+                    listOf(newEpisode(movieUrl) {
+                        name = "Filme"
+                        episode = 1
+                    })
+                )
+            }
         }
+
         return null
     }
  
