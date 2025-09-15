@@ -252,10 +252,10 @@ class Anroll : MainAPI() {
             val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
             val jsonObject = JSONObject(scriptContent)
             val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
-            val movieData = pageProps?.optJSONObject("filme")
+            val movieData = pageProps?.optJSONObject("data")?.optJSONObject("data_movie")
 
             val title = movieData?.optString("nome_filme") ?: return null
-            val plot = movieData?.optString("sinopse")
+            val plot = movieData?.optString("sinopse_filme")
             val poster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
             
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
@@ -263,7 +263,6 @@ class Anroll : MainAPI() {
                 this.plot = plot
             }
         }
-
         
         return null
     }
