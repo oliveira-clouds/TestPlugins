@@ -268,64 +268,68 @@ class Anroll : MainAPI() {
     }
 
 
- 
-override suspend fun loadLinks(
-    data: String,
-    isCasting: Boolean,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-): Boolean {
-    val episodeDocument = app.get(data).document
-    
-    val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
-    
-    var animeSlug: String? = null
-    var episodeNumber: String? = null
-
-    if (scriptTag != null) {
-        val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
-        try {
-            val jsonObject = JSONObject(scriptContent)
-            val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+ override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        if (data.contains("/f/")) {
+            val document = app.get(data).document
+            val scriptTag = document.selectFirst("script#__NEXT_DATA__")
             
-            // Tentativa 1: Encontrar dados no padrão "episodio"
-            val episodioData = pageProps?.optJSONObject("episodio")
-            if (episodioData != null) {
-                animeSlug = episodioData.optJSONObject("anime")?.optString("slug_serie")
-                episodeNumber = episodioData.optString("n_episodio")
-            }
-            
-            // Tentativa 2: Se falhar, tentar o padrão "data"
-            if (animeSlug == null || episodeNumber == null) {
-                val episodeData = pageProps?.optJSONObject("data")
-                if (episodeData != null) {
-                    animeSlug = episodeData.optJSONObject("anime")?.optString("slug_serie")
-                    episodeNumber = episodeData.optString("n_episodio")
+            if (scriptTag != null) {
+                val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+                val jsonObject = JSONObject(scriptContent)
+                val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+                val movieData = pageProps?.optJSONObject("filme")
+                val movieGenId = movieData?.optString("generate_id")
+                
+                if (movieGenId != null) {
+                    val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/filmes/$movieGenId.mp4/media-1/stream.m3u8"
+                    callback.invoke(
+                        newExtractorLink(
+                            "Anroll",
+                            "Anroll",
+                            constructedUrl,
+                            ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = data
+                        }
+                    )
+                    return true
                 }
             }
-            
-        } catch (e: Exception) {
             return false
         }
-    } else {
+        
+        val document = app.get(data).document
+        val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+        
+        if (scriptTag != null) {
+            val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+            val jsonObject = JSONObject(scriptContent)
+            val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+            val episodioData = pageProps?.optJSONObject("episodio")
+            val animeSlug = episodioData?.optJSONObject("anime")?.optString("slug_serie")
+            val episodeNumber = episodioData?.optString("n_episodio")
+            
+            if (animeSlug != null && episodeNumber != null) {
+                val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
+                
+                callback.invoke(
+                    newExtractorLink(
+                        "Anroll",
+                        "Anroll",
+                        constructedUrl,
+                        ExtractorLinkType.M3U8
+                    ) {
+                        this.referer = data
+                    }
+                )
+                return true
+            }
+        }
         return false
     }
-    
-    if (animeSlug != null && episodeNumber != null) {
-        val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/animes/$animeSlug/$episodeNumber.mp4/media-1/stream.m3u8"
-        
-        callback.invoke(
-            newExtractorLink(
-                "Anroll",
-                "Anroll",
-                constructedUrl,
-                ExtractorLinkType.M3U8
-            ) {
-                this.referer = data
-            }
-        )
-        return true
-    }
-    return false
-} 
 }
