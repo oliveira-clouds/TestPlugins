@@ -170,7 +170,7 @@ class Anroll : MainAPI() {
         }
     }
      
-  override suspend fun load(url: String): LoadResponse? {
+ override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         
         val isEpisodePage = url.contains("/e/")
@@ -203,10 +203,9 @@ class Anroll : MainAPI() {
             val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
             val animeData = pageProps?.optJSONObject("data") ?: pageProps?.optJSONObject("anime")
             
-            val poster = document.selectFirst("div.info-wrapper img")?.attr("src")?.let { fixUrlNull(it) }
-            val title = document.selectFirst("div.info-wrapper h1")?.text()?.trim() ?: return null
-            val plot = document.selectFirst("div.sinopse")?.text()
-
+            val title = animeData?.optString("titulo") ?: return null
+            val poster = animeData.optString("poster")
+            val plot = animeData.optString("sinopse")
             val idSerie = animeData?.optInt("id_serie", 0)
 
             val episodes = mutableListOf<Episode>()
@@ -240,7 +239,8 @@ class Anroll : MainAPI() {
             }
 
             return newAnimeLoadResponse(title, url, TvType.Anime) {
-                this.posterUrl = poster
+                val htmlPoster = document.selectFirst("div.info-wrapper img")?.attr("src")?.let { fixUrlNull(it) }
+                this.posterUrl = if (poster.isNotBlank()) poster else htmlPoster
                 this.plot = plot
                 addEpisodes(DubStatus.Subbed, episodes.reversed())
             }
