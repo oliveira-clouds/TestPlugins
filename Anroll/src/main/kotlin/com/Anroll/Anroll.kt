@@ -258,7 +258,7 @@ class Anroll : MainAPI() {
             val plot = movieData?.optString("sinopse")
             val generateId = movieData?.optString("generate_id")
             val poster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
-
+            
             val episodes = mutableListOf<Episode>()
             if (generateId != null) {
                 episodes.add(
