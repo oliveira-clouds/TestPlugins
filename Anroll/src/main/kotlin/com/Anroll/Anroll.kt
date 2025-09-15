@@ -202,10 +202,11 @@ class Anroll : MainAPI() {
             val jsonObject = JSONObject(scriptContent)
             val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
             val animeData = pageProps?.optJSONObject("data") ?: pageProps?.optJSONObject("anime")
+            
+            val poster = document.selectFirst("div.info-wrapper img")?.attr("src")?.let { fixUrlNull(it) }
+            val title = document.selectFirst("div.info-wrapper h1")?.text()?.trim() ?: return null
+            val plot = document.selectFirst("div.sinopse")?.text()
 
-            val title = animeData?.optString("titulo") ?: return null
-            val poster = animeData.optString("poster")
-            val plot = animeData.optString("sinopse")
             val idSerie = animeData?.optInt("id_serie", 0)
 
             val episodes = mutableListOf<Episode>()
@@ -239,9 +240,7 @@ class Anroll : MainAPI() {
             }
 
             return newAnimeLoadResponse(title, url, TvType.Anime) {
-                if (poster.isNotBlank()) {
-                    this.posterUrl = poster
-                }
+                this.posterUrl = poster
                 this.plot = plot
                 addEpisodes(DubStatus.Subbed, episodes.reversed())
             }
