@@ -272,7 +272,8 @@ class Anroll : MainAPI() {
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = poster
                 this.plot = plot
-                addEpisodes(DubStatus.Subbed, episodes)
+                this.set= episodes
+
             }
         }
         
