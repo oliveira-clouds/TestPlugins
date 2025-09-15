@@ -239,7 +239,9 @@ class Anroll : MainAPI() {
             }
 
             return newAnimeLoadResponse(title, url, TvType.Anime) {
-                this.posterUrl = poster
+                if (poster.isNotBlank()) {
+                    this.posterUrl = poster
+                }
                 this.plot = plot
                 addEpisodes(DubStatus.Subbed, episodes.reversed())
             }
