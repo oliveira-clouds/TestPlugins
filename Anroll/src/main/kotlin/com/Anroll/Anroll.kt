@@ -175,6 +175,7 @@ class Anroll : MainAPI() {
         
         val isEpisodePage = url.contains("/e/")
         val isSeriesPage = url.contains("/a/")
+        val isMoviePage = url.contains("/f/")
 
         if (isEpisodePage) {
             val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
@@ -244,8 +245,37 @@ class Anroll : MainAPI() {
                 this.plot = plot
                 addEpisodes(DubStatus.Subbed, episodes.reversed())
             }
-        }
+        }else if (isMoviePage) {
+            val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+                ?: return null
 
+            val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+            val jsonObject = JSONObject(scriptContent)
+            val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+            val movieData = pageProps?.optJSONObject("filme")
+
+            val title = movieData?.optString("nome_filme") ?: return null
+            val plot = movieData?.optString("sinopse")
+            val generateId = movieData?.optString("generate_id")
+            val poster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
+
+            val episodes = mutableListOf<Episode>()
+            if (generateId != null) {
+                episodes.add(
+                    newEpisode("$mainUrl/f/$generateId") {
+                        name = title
+                        episode = 1
+                    }
+                )
+            }
+            
+            return newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl = poster
+                this.plot = plot
+                addEpisodes(DubStatus.Subbed, episodes)
+            }
+        }
+        
         return null
     }
 
