@@ -173,39 +173,56 @@ class Anroll : MainAPI() {
    override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         
-        val isEpisode = url.contains("/e/")
-        val isMovie = url.contains("/f/")
-        val isSeries = url.contains("/a/")
+        val isEpisodePage = url.contains("/e/")
+        val isSeriesPage = url.contains("/a/")
 
-        if (isEpisode || isSeries) {
+        if (isEpisodePage || isSeriesPage) {
             val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
             val title = titleElement.text().trim()
 
             val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
             val plot = document.selectFirst("div.sinopse")?.text()
+            
+            // Lógica para lidar com uma página de episódio individual
+            if (isEpisodePage) {
+                val episodeText = document.selectFirst("h2#current_ep b")?.text()
+                val episode = episodeText?.toIntOrNull() ?: 1
 
-            val episodes = document.select("div.epcontrol a").mapNotNull { epElement ->
-                val epUrl = fixUrl(epElement.attr("href"))
-                val epName = epElement.text().trim()
-                val epNumber = epName.split(" ").lastOrNull()?.toIntOrNull()
+                return newAnimeLoadResponse(title, url, TvType.Anime) {
+                    this.posterUrl = poster
+                    this.plot = plot
+                    addEpisodes(DubStatus.Subbed, listOf(
+                        newEpisode(url) {
+                            this.name = "Episódio $episode"
+                            this.episode = episode
+                        }
+                    ))
+                }
+            } 
+        
+            else {
+                val episodes = document.select("div.epcontrol a").mapNotNull { epElement ->
+                    val epUrl = fixUrl(epElement.attr("href"))
+                    val epName = epElement.text().trim()
+                    val epNumber = epName.split(" ").lastOrNull()?.toIntOrNull()
 
-                newEpisode(epUrl) {
-                    this.name = epName
-                    this.episode = epNumber
+                    newEpisode(epUrl) {
+                        this.name = epName
+                        this.episode = epNumber
+                    }
+                }
+
+                return newAnimeLoadResponse(title, url, TvType.Anime) {
+                    this.posterUrl = poster
+                    this.plot = plot
+                    addEpisodes(DubStatus.Subbed, episodes.reversed())
                 }
             }
-
-            return newAnimeLoadResponse(title, url, TvType.Anime) {
-                this.posterUrl = poster
-                this.plot = plot
-                addEpisodes(DubStatus.Subbed, episodes.reversed())
-            }
-        } else if (isMovie) {
-           return null
         }
 
         return null
     }
+
 
  
 override suspend fun loadLinks(
