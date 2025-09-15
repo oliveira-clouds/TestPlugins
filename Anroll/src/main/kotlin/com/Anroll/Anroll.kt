@@ -170,53 +170,78 @@ class Anroll : MainAPI() {
         }
     }
      
-   override suspend fun load(url: String): LoadResponse? {
+  override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         
         val isEpisodePage = url.contains("/e/")
         val isSeriesPage = url.contains("/a/")
 
-        if (isEpisodePage || isSeriesPage) {
+        if (isEpisodePage) {
             val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
             val title = titleElement.text().trim()
-
             val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
             val plot = document.selectFirst("div.sinopse")?.text()
-            
-            // Lógica para lidar com uma página de episódio individual
-            if (isEpisodePage) {
-                val episodeText = document.selectFirst("h2#current_ep b")?.text()
-                val episode = episodeText?.toIntOrNull() ?: 1
+            val episodeText = document.selectFirst("h2#current_ep b")?.text()
+            val episode = episodeText?.toIntOrNull() ?: 1
 
-                return newAnimeLoadResponse(title, url, TvType.Anime) {
-                    this.posterUrl = poster
-                    this.plot = plot
-                    addEpisodes(DubStatus.Subbed, listOf(
-                        newEpisode(url) {
-                            this.name = "Episódio $episode"
-                            this.episode = episode
-                        }
-                    ))
-                }
-            } 
-        
-            else {
-                val episodes = document.select("div.epcontrol a").mapNotNull { epElement ->
-                    val epUrl = fixUrl(epElement.attr("href"))
-                    val epName = epElement.text().trim()
-                    val epNumber = epName.split(" ").lastOrNull()?.toIntOrNull()
-
-                    newEpisode(epUrl) {
-                        this.name = epName
-                        this.episode = epNumber
+            return newAnimeLoadResponse(title, url, TvType.Anime) {
+                this.posterUrl = poster
+                this.plot = plot
+                addEpisodes(DubStatus.Subbed, listOf(
+                    newEpisode(url) {
+                        this.name = "Episódio $episode"
+                        this.episode = episode
                     }
-                }
+                ))
+            }
+        } else if (isSeriesPage) {
+            val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+                ?: return null
 
-                return newAnimeLoadResponse(title, url, TvType.Anime) {
-                    this.posterUrl = poster
-                    this.plot = plot
-                    addEpisodes(DubStatus.Subbed, episodes.reversed())
+            val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+            val jsonObject = JSONObject(scriptContent)
+            val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+            val animeData = pageProps?.optJSONObject("data") ?: pageProps?.optJSONObject("anime")
+
+            val title = animeData?.optString("titulo") ?: return null
+            val poster = animeData.optString("poster")
+            val plot = animeData.optString("sinopse")
+            val idSerie = animeData?.optInt("id_serie", 0)
+
+            val episodes = mutableListOf<Episode>()
+
+            if (idSerie != null && idSerie != 0) {
+                val episodesUrl = "https://apiv3-prd.anroll.net/animes/$idSerie/episodes"
+                
+                try {
+                    val episodesResponse = app.get(episodesUrl)
+                    val episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
+                    
+                    if (episodesJsonArray != null) {
+                        (0 until episodesJsonArray.length()).mapNotNull { i ->
+                            val ep = episodesJsonArray.optJSONObject(i)
+                            val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
+                            val epGenId = ep?.optString("generate_id")
+                            
+                            if (epGenId != null && epNumber != null) {
+                                episodes.add(
+                                    newEpisode("$mainUrl/e/$epGenId") {
+                                        name = "Episódio $epNumber"
+                                        episode = epNumber
+                                    }
+                                )
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Se a API retornar um erro, o código simplesmente não adiciona os episódios.
                 }
+            }
+
+            return newAnimeLoadResponse(title, url, TvType.Anime) {
+                this.posterUrl = poster
+                this.plot = plot
+                addEpisodes(DubStatus.Subbed, episodes.reversed())
             }
         }
 
