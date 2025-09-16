@@ -143,7 +143,7 @@ class Anroll : MainAPI() {
         }
     }
     
-     override suspend fun search(query: String): List<SearchResponse> {
+    override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
         val response = app.get(searchUrl)
         val jsonArray = JSONObject(response.text).optJSONArray("data") ?: return emptyList()
@@ -151,7 +151,8 @@ class Anroll : MainAPI() {
         return (0 until jsonArray.length()).mapNotNull { i ->
             val item = jsonArray.optJSONObject(i)
             val title = item?.optString("title")
-            val poster = item?.optString("poster")
+            val type = item?.optString("type")
+            val slug = item?.optString("slug")
             val genId = item?.optString("gen_id")
             val genericPath = item?.optString("generic_path")
             
@@ -162,10 +163,23 @@ class Anroll : MainAPI() {
             } else {
                 return@mapNotNull null
             }
-
-            if (title != null && url != null) {
-                newAnimeSearchResponse(title, url, TvType.Anime) {
-                    this.posterUrl = poster
+            val posterUrl = if (type == "movie" && slug != null) {
+                "https://static.anroll.net/images/filmes/capas/$slug.jpg"
+            } else if (type == "anime" && slug != null) {
+                "https://static.anroll.net/images/animes/capas/$slug.jpg"
+            } else {
+                null
+            }
+            
+            if (title != null && url.isNotEmpty()) {
+                if (type == "movie") {
+                    newMovieSearchResponse(title, url, TvType.Movie) {
+                        this.posterUrl = posterUrl
+                    }
+                } else {
+                    newAnimeSearchResponse(title, url, TvType.Anime) {
+                        this.posterUrl = posterUrl
+                    }
                 }
             } else {
                 null
