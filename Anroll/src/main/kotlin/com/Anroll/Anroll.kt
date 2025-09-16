@@ -249,20 +249,27 @@ class Anroll : MainAPI() {
                     
                     if (episodesJsonArray != null) {
                         (0 until episodesJsonArray.length()).mapNotNull { i ->
-                            val ep = episodesJsonArray.optJSONObject(i)
-                            val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
-                            val epGenId = ep?.optString("generate_id")
-                            
-                            if (epGenId != null && epNumber != null) {
-                                episodes.add(
-                                    newEpisode("$mainUrl/e/$epGenId") {
-                                        name = "Episódio $epNumber"
-                                        episode = epNumber
-                                    }
-                                )
-                            }
+                        val ep = episodesJsonArray.optJSONObject(i)
+                        val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
+                        val epGenId = ep?.optString("generate_id")
+                
+                        // novos campos
+                        val epDescription = ep?.optString("sinopse")?.takeIf { it.isNotBlank() }
+                        val epImage = ep?.optString("thumb")?.takeIf { it.isNotBlank() }
+                
+                        if (epGenId != null && epNumber != null) {
+                            episodes.add(
+                                newEpisode("$mainUrl/e/$epGenId") {
+                                    name = "Episódio $epNumber"
+                                    episode = epNumber
+                                    description = epDescription  // sinopse
+                                    posterUrl = fixUrlNull(epImage) // imagem prévia
+                                    season = 1
+                                }
+                            )
                         }
                     }
+                }
                 } catch (e: Exception) {
                     // Se a API retornar um erro, o código simplesmente não adiciona os episódios.
                 }
