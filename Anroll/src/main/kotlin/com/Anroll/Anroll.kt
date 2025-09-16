@@ -21,10 +21,10 @@ class Anroll : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime, TvType.Movie)
     
-        override val mainPage = mainPageOf(
+       override val mainPage = mainPageOf(
         "lancamentos" to "Últimos Lançamentos",
         "data_animes" to "Animes em Alta",
-        "data_movies" to "Filmes"
+        "lista_filmes" to "Filmes"
     )
     
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -38,7 +38,7 @@ class Anroll : MainAPI() {
                     parseLancamentoCard(element)?.let { items.add(it) }
                 }
             }
-            "data_animes", "data_movies" -> {
+            "data_animes" -> {
                 val document = app.get(mainUrl).document
                 val scriptTag = document.selectFirst("script#__NEXT_DATA__")
                     ?: return newHomePageResponse(request.name, emptyList())
@@ -58,45 +58,35 @@ class Anroll : MainAPI() {
                         val generateId: String
                         val posterUrl: String
 
-                        when (request.data) {
-                            "data_animes" -> {
-                                title = entry?.optString("titulo") ?: ""
-                                generateId = entry?.optString("generate_id") ?: ""
-                                url = "$mainUrl/a/$generateId"
-                                type = TvType.Anime
-                                posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
-                            }
-                            "data_movies" -> {
-                                title = entry?.optString("nome_filme") ?: ""
-                                generateId = entry?.optString("generate_id") ?: ""
-                                url = "$mainUrl/f/$generateId"
-                                type = TvType.Movie
-                                // AQUI ESTÁ A CORREÇÃO: Pega a capa diretamente do JSON
-                                posterUrl = entry.optString("capa_filme")
-                            }
-                            else -> {
-                                title = ""
-                                generateId = ""
-                                url = ""
-                                type = TvType.Anime
-                                posterUrl = ""
-                            }
-                        }
+                        title = entry?.optString("titulo") ?: ""
+                        generateId = entry?.optString("generate_id") ?: ""
+                        url = "$mainUrl/a/$generateId"
+                        type = TvType.Anime
+                        posterUrl = document.select("a[href*=$generateId]").select("img").attr("src")
+
                         if (title.isNotEmpty() && generateId.isNotEmpty()) {
-                            if (type == TvType.Movie) {
-                                items.add(
-                                    newMovieSearchResponse(title, url, type) {
-                                        if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
-                                    }
-                                )
-                            } else {
-                                items.add(
-                                    newAnimeSearchResponse(title, url, type) {
-                                        if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
-                                    }
-                                )
-                            }
+                            items.add(
+                                newAnimeSearchResponse(title, url, type) {
+                                    if (posterUrl.isNotEmpty()) this.posterUrl = fixUrl(posterUrl)
+                                }
+                            )
                         }
+                    }
+                }
+            }
+            "lista_filmes" -> {
+                val document = app.get("$mainUrl/filmes").document
+                document.select("div.movielistitem").forEach { element ->
+                    val link = element.selectFirst("a[href]")
+                    val title = element.selectFirst("span.title")?.text()?.trim()
+                    val posterUrl = element.selectFirst("img")?.attr("src")
+                    
+                    if (link != null && title != null && posterUrl != null) {
+                        items.add(
+                            newMovieSearchResponse(title, fixUrl(link.attr("href")), TvType.Movie) {
+                                this.posterUrl = fixUrlNull(posterUrl)
+                            }
+                        )
                     }
                 }
             }
