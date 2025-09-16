@@ -194,32 +194,34 @@ class Anroll : MainAPI() {
         val isSeriesPage = url.contains("/a/")
         val isMoviePage = url.contains("/f/")
 
-         if (isEpisodePage) {
+        if (isEpisodePage) {
             val scriptTag = document.selectFirst("script#__NEXT_DATA__") ?: return null
             val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
             val jsonObject = JSONObject(scriptContent)
             val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
-            val episodioData = pageProps?.optJSONObject("episodio") ?: return null
-            val animeData = episodioData.optJSONObject("anime")
-            
+
+            // Lógica robusta para encontrar os dados do episódio e da série
+            val dataObject = pageProps?.optJSONObject("episodio") ?: pageProps?.optJSONObject("data")
+            val animeData = dataObject?.optJSONObject("anime")
+
+            // Extrai as informações necessárias
             val title = animeData?.optString("titulo") ?: return null
             val plot = animeData?.optString("sinopse")
             val generateId = animeData?.optString("generate_id")
-            
-            // Este é o URL que o Cloudstream usará para levar o usuário à página da série.
+
+            // Constrói a URL da série para o link adicional
             val showUrl = if (generateId != null) "$mainUrl/a/$generateId" else url
             
             val posterUrl = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrl(it) }
             
-            val episodeName = episodioData.optString("nome_episodio") ?: "Episódio ${episodioData.optString("n_episodio")}"
-            val episodeNumber = episodioData.optString("n_episodio")?.toIntOrNull()
+            val episodeName = dataObject.optString("nome_episodio") ?: "Episódio ${dataObject.optString("n_episodio")}"
+            val episodeNumber = dataObject.optString("n_episodio")?.toIntOrNull()
             
             val episodes = listOf(newEpisode(url) {
                 name = episodeName
                 episode = episodeNumber
             })
             
-            // Aqui passamos a URL da série (`showUrl`) para o newAnimeLoadResponse
             return newAnimeLoadResponse(title, showUrl, TvType.Anime) {
                 this.posterUrl = posterUrl
                 this.plot = plot
