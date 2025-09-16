@@ -273,6 +273,34 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
+        if (data.contains("/f/")) {
+            val document = app.get(data).document
+            val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+            
+            if (scriptTag != null) {
+                val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+                val jsonObject = JSONObject(scriptContent)
+                val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+                val movieData = pageProps?.optJSONObject("data")?.optJSONObject("data_movie")
+                val movieSlug = movieData?.optString("slug_filme")
+                
+                if (movieSlug != null) {
+                    val constructedUrl = "https://cdn-zenitsu-2-gamabunta.b-cdn.net/cf/hls/movies/$movieSlug/movie.mp4/media-1/stream.m3u8"
+                    callback.invoke(
+                        newExtractorLink(
+                            "Anroll",
+                            "Anroll",
+                            constructedUrl,
+                            ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = data
+                        }
+                    )
+                    return true
+                }
+            }
+            return false
+        }
     val episodeDocument = app.get(data).document
     
     val scriptTag = episodeDocument.selectFirst("script#__NEXT_DATA__")
