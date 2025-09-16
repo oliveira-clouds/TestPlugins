@@ -240,10 +240,10 @@ class Anroll : MainAPI() {
 
     val episodes = mutableListOf<Episode>()
 
-    // Pega a lista de episódios via HTML
+    // pega a lista de episódios via HTML
     val episodeElements = document.select("li.itemlistepisode")
 
-    // Se tiver ID válido, pega o JSON de episódios (pra sinopse)
+    // pega o JSON da API (pra sinopse)
     var episodesJsonArray: org.json.JSONArray? = null
     if (idSerie != null && idSerie != 0) {
         try {
@@ -256,7 +256,7 @@ class Anroll : MainAPI() {
     }
 
     for (element in episodeElements) {
-        val epUrl = fixUrl(element.selectFirst("a")?.attr("href")) ?: continue
+        val epUrl = fixUrlNull(element.selectFirst("a")?.attr("href")) ?: continue
         val epImage = element.selectFirst("img")?.attr("src")
         val epNumber = element.selectFirst("div.n_episodio span")?.text()?.toIntOrNull()
         val epTitleHtml = element.selectFirst("span.titulo_episodio")?.text()
