@@ -194,25 +194,37 @@ class Anroll : MainAPI() {
         val isSeriesPage = url.contains("/a/")
         val isMoviePage = url.contains("/f/")
 
-       if (isEpisodePage) {
-            val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
-            val title = titleElement.text().trim()
-            val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
-            val plot = document.selectFirst("div.sinopse")?.text()
-            val episodeText = document.selectFirst("h2#current_ep b")?.text()
-            val episode = episodeText?.toIntOrNull() ?: 1
+     if (isEpisodePage) {
+    val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
+    val title = titleElement.text().trim()
+    val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
+    val plot = document.selectFirst("div.sinopse")?.text()
+    val episodeText = document.selectFirst("h2#current_ep b")?.text()
+    val episode = episodeText?.toIntOrNull() ?: 1
 
-            return newAnimeLoadResponse(title, "https://www.anroll.net/a/pI5rxkNCCk", TvType.Anime) {
-                this.posterUrl = poster
-                this.plot = plot
-                addEpisodes(DubStatus.Subbed, listOf(
-                    newEpisode(url) {
-                        this.name = "Episódio $episode"
-                        this.episode = episode
-                    }
-                ))
+    // link para a página principal do anime (pego do <a> do título do episódio)
+    val animeUrl = document.selectFirst("div#epinfo h1 a")?.attr("href")
+
+    return newAnimeLoadResponse(title, url, TvType.Anime) {
+        this.posterUrl = poster
+        this.plot = plot
+        addEpisodes(DubStatus.Subbed, listOf(
+            newEpisode(url) {
+                this.name = "Episódio $episode"
+                this.episode = episode
             }
-        } else if (isSeriesPage) {
+        ))
+
+        // botão extra "Ver todos os episódios"
+        if (animeUrl != null) {
+            this.recommendations = listOf(
+                newAnimeSearchResponse("Ver todos os episódios", fixUrl(animeUrl), TvType.Anime) {
+                    this.posterUrl = poster
+                }
+            )
+        }
+    }
+} else if (isSeriesPage) {
             val scriptTag = document.selectFirst("script#__NEXT_DATA__")
                 ?: return null
 
