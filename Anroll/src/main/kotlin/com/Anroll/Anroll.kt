@@ -224,72 +224,67 @@ class Anroll : MainAPI() {
             )
         }
     }
-} else if (isSeriesPage) {
-    val scriptTag = document.selectFirst("script#__NEXT_DATA__")
-        ?: return null
+}  else if (isSeriesPage) {
+            val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+                ?: return null
 
-    val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
-    val jsonObject = JSONObject(scriptContent)
-    val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
-    val animeData = pageProps?.optJSONObject("data") ?: pageProps?.optJSONObject("anime")
-    
-    val title = animeData?.optString("titulo") ?: return null
-    val poster = animeData.optString("poster")
-    val plot = animeData.optString("sinopse")
-    val idSerie = animeData?.optInt("id_serie", 0)
+            val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+            val jsonObject = JSONObject(scriptContent)
+            val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+            val animeData = pageProps?.optJSONObject("data") ?: pageProps?.optJSONObject("anime")
+            
+            val title = animeData?.optString("titulo") ?: return null
+            val plot = animeData.optString("sinopse")
+            val idSerie = animeData?.optInt("id_serie", 0)
+            val slugSerie = animeData?.optString("slug_serie") ?: ""
 
-    val episodes = mutableListOf<Episode>()
+            val episodes = mutableListOf<Episode>()
 
-    // pega a lista de episódios via HTML
-    val episodeElements = document.select("li.itemlistepisode")
-
-    // pega o JSON da API (pra sinopse)
-    var episodesJsonArray: org.json.JSONArray? = null
-    if (idSerie != null && idSerie != 0) {
-        try {
-            val episodesUrl = "https://apiv3-prd.anroll.net/animes/$idSerie/episodes"
-            val episodesResponse = app.get(episodesUrl)
-            episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
-        } catch (e: Exception) {
-            // ignora erro
-        }
-    }
-
-    for (element in episodeElements) {
-        val epUrl = fixUrlNull(element.selectFirst("a")?.attr("href")) ?: continue
-        val epImage = element.selectFirst("img")?.attr("src")
-        val epNumber = element.selectFirst("div.n_episodio span")?.text()?.toIntOrNull()
-        val epTitleHtml = element.selectFirst("span.titulo_episodio")?.text()
-        val epTitle = if (!epTitleHtml.isNullOrBlank() && epTitleHtml != "N/A") epTitleHtml else null
-
-        // tenta casar com o JSON pra pegar sinopse
-        val epPlot = episodesJsonArray
-            ?.let { arr ->
-                (0 until arr.length())
-                    .mapNotNull { arr.optJSONObject(it) }
-                    .firstOrNull { it.optString("n_episodio").toIntOrNull() == epNumber }
-                    ?.optString("sinopse_episodio")
-                    ?.takeIf { it.isNotBlank() }
+            if (idSerie != null && idSerie != 0) {
+                val episodesUrl = "https://apiv3-prd.anroll.net/animes/$idSerie/episodes"
+                
+                try {
+                    val episodesResponse = app.get(episodesUrl)
+                    val episodesJsonArray = JSONObject(episodesResponse.text).optJSONArray("data")
+                    
+                    if (episodesJsonArray != null) {
+                        (0 until episodesJsonArray.length()).mapNotNull { i ->
+                            val ep = episodesJsonArray.optJSONObject(i)
+                            val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
+                            val epGenId = ep?.optString("generate_id")
+                            val epPlot = ep?.optString("sinopse_episodio")
+                            
+                            if (epGenId != null && epNumber != null) {
+                                val episodePoster = if (slugSerie.isNotEmpty()) {
+                                    "https://static.anroll.net/images/animes/screens/$slugSerie/${String.format("%03d", epNumber)}.jpg"
+                                } else {
+                                    null
+                                }
+                                
+                                episodes.add(
+                                    newEpisode("$mainUrl/e/$epGenId") {
+                                        name = "Episódio $epNumber"
+                                        episode = epNumber
+                                        description = epPlot
+                                        posterUrl = episodePoster
+                                    }
+                                )
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Se a API retornar um erro, o código simplesmente não adiciona os episódios.
+                }
             }
-
-        episodes.add(
-            newEpisode(epUrl) {
-                name = epTitle ?: "Episódio $epNumber"
-                episode = epNumber
-                description = epPlot
-                season = 1
-                posterUrl = fixUrlNull(epImage)
+            
+            val htmlPoster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
+            
+            return newAnimeLoadResponse(title, url, TvType.Anime) {
+                this.posterUrl = htmlPoster
+                this.plot = plot
+                addEpisodes(DubStatus.Subbed, episodes.reversed())
             }
-        )
-    }
-
-    return newAnimeLoadResponse(title, url, TvType.Anime) {
-        val htmlPoster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
-        this.posterUrl = if (poster.isNotBlank()) poster else htmlPoster
-        this.plot = plot
-        addEpisodes(DubStatus.Subbed, episodes.reversed())
-    }
-}else if (isMoviePage) {
+        }else if (isMoviePage) {
             val scriptTag = document.selectFirst("script#__NEXT_DATA__")
                 ?: return null
 
