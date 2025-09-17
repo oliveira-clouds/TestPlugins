@@ -1,4 +1,3 @@
-CloudStream - Plugin AnimesROLL
 Plugin para o aplicativo CloudStream que adiciona conteúdo do site AnimesROLL.
 
 📌 Funcionalidades
