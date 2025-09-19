@@ -205,12 +205,19 @@ class Anroll : MainAPI() {
      if (isEpisodePage) {
     val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
     val title = titleElement.text().trim()
-    val episodeTitleElement = document.selectFirst("h2#current_ep")?.textNodes()?.getOrNull(1)?.text()
-    val episodeTitle = if (!episodeTitleElement.isNullOrBlank()) {
-        episodeTitleElement.replace(" - ", "").trim()
+    val fullTitleText = document.selectFirst("h2#current_ep")?.text()
+     val episodeTitle = if (fullTitleText != null) {
+    // Encontra o último hífen no texto completo
+    val lastHyphenIndex = fullTitleText.lastIndexOf("-")
+    if (lastHyphenIndex != -1) {
+        // Pega o texto que vem depois do último hífen
+        fullTitleText.substring(lastHyphenIndex + 1).trim()
     } else {
         null
     }
+} else {
+    null
+}
     val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
     val plot = document.selectFirst("div.sinopse")?.text()
     val episodeNumberText = document.selectFirst("h2#current_ep b")?.text()
