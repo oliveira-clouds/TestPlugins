@@ -206,51 +206,30 @@ class Anroll : MainAPI() {
     val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
     val title = titleElement.text().trim()
     val fullTitleText = document.selectFirst("h2#current_ep")?.text()
-     val episodeTitle = if (fullTitleText != null) {
-    // Encontra o último hífen no texto completo
-    val lastHyphenIndex = fullTitleText.lastIndexOf("-")
-    if (lastHyphenIndex != -1) {
-        // Pega o texto que vem depois do último hífen
-        fullTitleText.substring(lastHyphenIndex + 1).trim()
-    } else {
-        null
-    }
-} else {
-    null
-}
+    val episodeTitle = fullTitleText?.substringAfterLast("-")?.trim()
     val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
     val plot = document.selectFirst("div.sinopse")?.text()
     val episodeNumberText = document.selectFirst("h2#current_ep b")?.text()
-    val episodeText = document.selectFirst("h2#current_ep b")?.text()
-    val episode = episodeText?.toIntOrNull() ?: 1
-    val episodeName = if (episodeTitle != null && episodeTitle != "N/A") {
+    val episode = episodeNumberText?.toIntOrNull() ?: 1
+    val episodeName = if (!episodeTitle.isNullOrEmpty() && episodeTitle != "N/A") {
         "Episódio $episodeNumberText - $episodeTitle"
     } else {
         "Episódio $episodeNumberText"
     }
-    // link para a página principal do anime (pego do <a> do título do episódio)
     val animeUrl = document.selectFirst("div#epinfo h1 a")?.attr("href")
 
-    return newAnimeLoadResponse(title, url, TvType.Anime) {
+    return newEpisodeSearchResponse(title, url) {
+        this.name = episodeName
         this.posterUrl = poster
         this.plot = plot
-        addEpisodes(DubStatus.Subbed, listOf(
-            newEpisode(url) {
-                this.name = episodeName
-                this.episode = episode
-            }
-        ))
+        this.episode = episode
 
-        // botão extra "Ver todos os episódios"
+        // link direto pra página do anime pai
         if (animeUrl != null) {
-            this.recommendations = listOf(
-                newAnimeSearchResponse("Ver todos os episódios", fixUrl(animeUrl), TvType.Anime) {
-                    this.posterUrl = poster
-                }
-            )
+            this.parentUrl = fixUrl(animeUrl)
         }
     }
-}  else if (isSeriesPage) {
+}else if (isSeriesPage) {
             val scriptTag = document.selectFirst("script#__NEXT_DATA__")
                 ?: return null
 
