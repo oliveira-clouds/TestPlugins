@@ -42,7 +42,7 @@ class Anroll : MainAPI() {
                     ?.optJSONObject("pageProps")
                     ?.optJSONObject("data")
                     ?: return newHomePageResponse(request.name, emptyList())
-                val lancamentosArray = data.optJSONArray("data_lancamentos")
+                val lancamentosArray = data.optJSONArray("data_releases")
                 if (lancamentosArray != null) {
                     (0 until lancamentosArray.length()).forEach { i ->
                         val entry = lancamentosArray.optJSONObject(i)
