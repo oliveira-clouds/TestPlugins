@@ -125,34 +125,7 @@ class Anroll : MainAPI() {
             hasNext = false
         )
     }
-   
-    private fun parseLancamentoCard(element: Element): SearchResponse? {
-        val link = element.selectFirst("a[href]") ?: return null
-        val href = fixUrl(link.attr("href"))
-        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
-        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
 
-        val episodeText = element.selectFirst("span.episode-badge b")?.text()
-        val episode = episodeText?.toIntOrNull() ?: 1
-
-        val isDub = element.selectFirst("div#labels-column2 div.imwHAL") != null
-
-        return newAnimeSearchResponse(title, href, TvType.Anime) {
-            this.posterUrl = posterUrl
-            this.addDubStatus(isDub, episode)
-        }
-    }
-
-    private fun parseAdicionadoCard(element: Element): SearchResponse? {
-        val link = element.selectFirst("a[href]") ?: return null
-        val href = fixUrl(link.attr("href"))
-        val title = element.selectFirst("h1")?.text()?.trim() ?: return null
-        val posterUrl = element.selectFirst("img")?.attr("src")?.let { fixUrlNull(it) }
-
-        return newAnimeSearchResponse(title, href, TvType.Anime) {
-            this.posterUrl = posterUrl
-        }
-    }
      private fun parseLancamentoJson(entry: JSONObject?): SearchResponse? {
         val episodeData = entry?.optJSONObject("episode") ?: return null
         val animeData = episodeData.optJSONObject("anime") ?: return null
@@ -167,7 +140,7 @@ class Anroll : MainAPI() {
         val url = "$mainUrl/e/$generateId"
         val slug = animeData.optString("slug_serie")
         val posterUrl = if (slug.isNotEmpty()) {
-            "https://static.anroll.net/images/animes/capas/$slug.jpg"
+            https://static.anroll.net/images/animes/screens/$slug/${String.format("%03d", episodeNumber)}.jpg
         } else {
             null
         }
