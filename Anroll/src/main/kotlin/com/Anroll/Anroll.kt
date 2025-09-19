@@ -33,11 +33,23 @@ class Anroll : MainAPI() {
 
         when (request.data) {
             "lancamentos" -> {
-                val document = app.get("$mainUrl/lancamentos").document
-                document.select("ul.UVrQY li.release-item").forEach { element ->
-                    parseLancamentoCard(element)?.let { items.add(it) }
+            val document = app.get("$mainUrl/lancamentos").document
+            val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+                ?: return newHomePageResponse(request.name, emptyList())
+            val scriptContent = scriptTag.data()
+            val jsonObject = JSONObject(scriptContent)
+            val data = jsonObject.optJSONObject("props")
+                ?.optJSONObject("pageProps")
+                ?.optJSONObject("data")
+                ?: return newHomePageResponse(request.name, emptyList())
+            val lancamentosArray = data.optJSONArray("data_lancamentos")
+            if (lancamentosArray != null) {
+                (0 until lancamentosArray.length()).forEach { i ->
+                    val entry = lancamentosArray.optJSONObject(i)
+                    parseLancamentoJson(entry)?.let { items.add(it) }
                 }
             }
+        }
             "data_animes" -> {
                 val document = app.get(mainUrl).document
                 val scriptTag = document.selectFirst("script#__NEXT_DATA__")
@@ -113,7 +125,24 @@ class Anroll : MainAPI() {
             hasNext = false
         )
     }
+    private fun parseLancamentoJson(entry: JSONObject?): SearchResponse? {
+    val episodeData = entry?.optJSONObject("episode") ?: return null
+    val animeData = episodeData.optJSONObject("anime") ?: return null
 
+    val title = animeData.optString("titulo")
+    val generateId = episodeData.optString("generate_id")
+    val isDub = animeData.optInt("dub") == 1
+    val episodeNumber = episodeData.optString("n_episodio")?.toIntOrNull() ?: 1
+
+    if (title.isEmpty() || generateId.isEmpty()) return null
+
+    val url = "$mainUrl/e/$generateId"
+    val slug = animeData.optString("slug_serie")
+    val posterUrl = if (slug.isNotEmpty()) {
+        "https://static.anroll.net/images/animes/capas/$slug.jpg"
+    } else {
+        null
+    }
 
     private fun parseLancamentoCard(element: Element): SearchResponse? {
         val link = element.selectFirst("a[href]") ?: return null
