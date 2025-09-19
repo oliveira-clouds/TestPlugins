@@ -140,7 +140,7 @@ class Anroll : MainAPI() {
         val url = "$mainUrl/e/$generateId"
         val slug = animeData.optString("slug_serie")
         val posterUrl = if (slug.isNotEmpty()) {
-            "https://static.anroll.net/images/animes/screens/$slugSerie/${"%03d".format(epNumber)}.jpg"
+           "https://static.anroll.net/images/animes/screens/$slug/${"%03d".format(episodeNumber)}.jpg"
         } else {
             null
         }
@@ -261,6 +261,7 @@ class Anroll : MainAPI() {
                             val epNumber = ep?.optString("n_episodio")?.toIntOrNull()
                             val epGenId = ep?.optString("generate_id")
                             val epPlot = ep?.optString("sinopse_episodio")
+                            val epTitle = ep?.optString("titulo_episodio")
                             
                             if (epGenId != null && epNumber != null) {
                                 val episodePoster = if (slugSerie.isNotEmpty()) {
@@ -271,7 +272,7 @@ class Anroll : MainAPI() {
                                 
                                 episodes.add(
                                     newEpisode("$mainUrl/e/$epGenId") {
-                                        name = "Episódio $epNumber"
+                                        name = if (!epTitle.isNullOrEmpty()) "Episódio $epNumber - $epTitle " else "Episódio $epNumber"
                                         episode = epNumber
                                         description = epPlot
                                         posterUrl = episodePoster
