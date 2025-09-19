@@ -201,8 +201,7 @@ class Anroll : MainAPI() {
         val isEpisodePage = url.contains("/e/")
         val isSeriesPage = url.contains("/a/")
         val isMoviePage = url.contains("/f/")
-
-     if (isEpisodePage) {
+if (isEpisodePage) {
     val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
     val title = titleElement.text().trim()
     val fullTitleText = document.selectFirst("h2#current_ep")?.text()
@@ -218,16 +217,18 @@ class Anroll : MainAPI() {
     }
     val animeUrl = document.selectFirst("div#epinfo h1 a")?.attr("href")
 
-    return newEpisodeSearchResponse(title, url) {
-        this.name = episodeName
+    return newAnimeLoadResponse(title, url, TvType.Anime) {
         this.posterUrl = poster
         this.plot = plot
-        this.episode = episode
-
-        // link direto pra página do anime pai
-        if (animeUrl != null) {
-            this.parentUrl = fixUrl(animeUrl)
-        }
+        addEpisodes(DubStatus.Subbed, listOf(
+            newEpisode(url) {
+                this.name = episodeName
+                this.episode = episode
+                if (animeUrl != null) {
+                    this.parentUrl = fixUrl(animeUrl)
+                }
+            }
+        ))
     }
 }else if (isSeriesPage) {
             val scriptTag = document.selectFirst("script#__NEXT_DATA__")
