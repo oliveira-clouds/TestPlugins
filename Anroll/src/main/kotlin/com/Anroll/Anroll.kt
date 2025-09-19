@@ -140,7 +140,7 @@ class Anroll : MainAPI() {
         val url = "$mainUrl/e/$generateId"
         val slug = animeData.optString("slug_serie")
         val posterUrl = if (slug.isNotEmpty()) {
-            https://static.anroll.net/images/animes/screens/$slug/${String.format("%03d", episodeNumber)}.jpg
+            "https://static.anroll.net/images/animes/screens/$slugSerie/${"%03d".format(epNumber)}.jpg"
         } else {
             null
         }
