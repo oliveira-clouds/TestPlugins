@@ -213,9 +213,14 @@ class Anroll : MainAPI() {
     }
     val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
     val plot = document.selectFirst("div.sinopse")?.text()
+    val episodeNumberText = document.selectFirst("h2#current_ep b")?.text()
     val episodeText = document.selectFirst("h2#current_ep b")?.text()
     val episode = episodeText?.toIntOrNull() ?: 1
-
+    val episodeName = if (episodeTitle != null && episodeTitle != "N/A") {
+        "Episódio $episodeNumberText - $episodeTitle"
+    } else {
+        "Episódio $episodeNumberText"
+    }
     // link para a página principal do anime (pego do <a> do título do episódio)
     val animeUrl = document.selectFirst("div#epinfo h1 a")?.attr("href")
 
@@ -224,7 +229,7 @@ class Anroll : MainAPI() {
         this.plot = plot
         addEpisodes(DubStatus.Subbed, listOf(
             newEpisode(url) {
-                this.name = if (episodeTitle != null && episodeTitle!= "N/A") "Episódio $episodeNumberText - $episodeTitle" else "Episódio $episodeNumberText"
+                this.name = episodeName
                 this.episode = episode
             }
         ))
