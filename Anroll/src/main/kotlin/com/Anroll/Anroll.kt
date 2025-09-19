@@ -205,6 +205,12 @@ class Anroll : MainAPI() {
      if (isEpisodePage) {
     val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
     val title = titleElement.text().trim()
+    val episodeTitleElement = document.selectFirst("h2#current_ep")?.textNodes()?.getOrNull(1)?.text()
+    val episodeTitle = if (!episodeTitleElement.isNullOrBlank()) {
+        episodeTitleElement.replace(" - ", "").trim()
+    } else {
+        null
+    }
     val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
     val plot = document.selectFirst("div.sinopse")?.text()
     val episodeText = document.selectFirst("h2#current_ep b")?.text()
@@ -218,7 +224,7 @@ class Anroll : MainAPI() {
         this.plot = plot
         addEpisodes(DubStatus.Subbed, listOf(
             newEpisode(url) {
-                this.name = "Episódio $episode"
+                this.name = if (episodeTitle != null && episodeTitle!= "N/A") "Episódio $episodeNumberText - $episodeTitle" else "Episódio $episodeNumberText"
                 this.episode = episode
             }
         ))
@@ -272,7 +278,7 @@ class Anroll : MainAPI() {
                                 
                                 episodes.add(
                                     newEpisode("$mainUrl/e/$epGenId") {
-                                        name = if (!epTitle.isNullOrEmpty()) "Episódio $epNumber - $epTitle " else "Episódio $epNumber"
+                                        name = if (!epTitle.isNullOrEmpty() && epTitle != "N/A") "Episódio $epNumber - $epTitle " else "Episódio $epNumber"
                                         episode = epNumber
                                         description = epPlot
                                         posterUrl = episodePoster
