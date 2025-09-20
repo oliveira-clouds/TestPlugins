@@ -126,34 +126,31 @@ class Anroll : MainAPI() {
         )
     }
 
-   private fun parseLancamentoJson(entry: JSONObject?): SearchResponse? {
-    val episodeData = entry?.optJSONObject("episode") ?: return null
-    val animeData = episodeData.optJSONObject("anime") ?: return null
+     private fun parseLancamentoJson(entry: JSONObject?): SearchResponse? {
+        val episodeData = entry?.optJSONObject("episode") ?: return null
+        val animeData = episodeData.optJSONObject("anime") ?: return null
 
-    val title = animeData.optString("titulo")
-    val animeSeriesGenId = animeData.optString("generate_id") // ID da série
-    val episodeGenId = episodeData.optString("generate_id") // ID do episódio
-    val isDub = animeData.optInt("dub") == 1
-    val episodeNumber = episodeData.optString("n_episodio")?.toIntOrNull() ?: 1
-    val slug = animeData.optString("slug_serie")
+        val title = animeData.optString("titulo")
+        val generateId = episodeData.optString("generate_id")
+        val isDub = animeData.optInt("dub") == 1
+        val episodeNumber = episodeData.optString("n_episodio")?.toIntOrNull() ?: 1
 
-    if (title.isEmpty() || animeSeriesGenId.isEmpty()) return null
+        if (title.isEmpty() || generateId.isEmpty()) return null
 
-    // AQUI ESTÁ A CORREÇÃO: Usar o ID da série na URL
-    val url = "$mainUrl/a/$animeSeriesGenId#$episodeGenId"
+        val url = "$mainUrl/e/$generateId"
+        val slug = animeData.optString("slug_serie")
+        val posterUrl = if (slug.isNotEmpty()) {
+           "https://static.anroll.net/images/animes/screens/$slug/${"%03d".format(episodeNumber)}.jpg"
+        } else {
+            null
+        }
 
-    val posterUrl = if (slug.isNotEmpty()) {
-        "https://static.anroll.net/images/animes/screens/$slug/${"%03d".format(episodeNumber)}.jpg"
-    } else {
-        null
+        return newAnimeSearchResponse(title, url, TvType.Anime) {
+            this.posterUrl = posterUrl
+            this.addDubStatus(isDub, episodeNumber)
+        }
     }
-
-    return newAnimeSearchResponse(title, url, TvType.Anime) {
-        this.posterUrl = posterUrl
-        this.addDubStatus(isDub, episodeNumber)
-    }
-}
-   
+    
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
         val response = app.get(searchUrl)
