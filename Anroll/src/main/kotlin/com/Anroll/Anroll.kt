@@ -237,7 +237,7 @@ class Anroll : MainAPI() {
         addEpisodes(DubStatus.Subbed, listOf(
             newEpisode(url) {
                 this.name = episodeName
-                this.parentUrl=animeUrl
+                this.parentID=animeUrl
                 this.episode = episode
             }
         ))
