@@ -126,37 +126,30 @@ class Anroll : MainAPI() {
         )
     }
 
-     private fun parseLancamentoJson(entry: JSONObject?): EpisodeSearchResponse? {
-    val episodeData = entry?.optJSONObject("episode") ?: return null
-    val animeData = episodeData.optJSONObject("anime") ?: return null
+     private fun parseLancamentoJson(entry: JSONObject?): SearchResponse? {
+        val episodeData = entry?.optJSONObject("episode") ?: return null
+        val animeData = episodeData.optJSONObject("anime") ?: return null
 
-    val title = animeData.optString("titulo")
-    val generateId = episodeData.optString("generate_id")
-    val isDub = animeData.optInt("dub") == 1
-    val episodeNumber = episodeData.optString("n_episodio")?.toIntOrNull() ?: 1
+        val title = animeData.optString("titulo")
+        val generateId = episodeData.optString("generate_id")
+        val isDub = animeData.optInt("dub") == 1
+        val episodeNumber = episodeData.optString("n_episodio")?.toIntOrNull() ?: 1
 
-    if (title.isEmpty() || generateId.isEmpty()) return null
+        if (title.isEmpty() || generateId.isEmpty()) return null
 
-    val url = "$mainUrl/e/$generateId"
-    val slug = animeData.optString("slug_serie")
-    val animeUrl = "$mainUrl/a/${animeData.optString("generate_id")}"
-    val posterUrl = if (slug.isNotEmpty()) {
-        "https://static.anroll.net/images/animes/screens/$slug/${"%03d".format(episodeNumber)}.jpg"
-    } else null
+        val url = "$mainUrl/e/$generateId"
+        val slug = animeData.optString("slug_serie")
+        val posterUrl = if (slug.isNotEmpty()) {
+           "https://static.anroll.net/images/animes/screens/$slug/${"%03d".format(episodeNumber)}.jpg"
+        } else {
+            null
+        }
 
-    return EpisodeSearchResponse(
-        name = title,
-        url = url,
-        apiName = this.name,
-        type = TvType.Anime,
-        posterUrl = posterUrl,
-        episode = episodeNumber,
-        parentUrl = animeUrl 
-    ).apply {
-        this.addDubStatus(isDub, episodeNumber)
+        return newAnimeSearchResponse(title, url, TvType.Anime) {
+            this.posterUrl = posterUrl
+            this.addDubStatus(isDub, episodeNumber)
+        }
     }
-}
-
     
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
@@ -208,20 +201,34 @@ class Anroll : MainAPI() {
         val isEpisodePage = url.contains("/e/")
         val isSeriesPage = url.contains("/a/")
         val isMoviePage = url.contains("/f/")
-if (isEpisodePage) {
+
+     if (isEpisodePage) {
     val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
     val title = titleElement.text().trim()
     val fullTitleText = document.selectFirst("h2#current_ep")?.text()
-    val episodeTitle = fullTitleText?.substringAfterLast("-")?.trim()
+     val episodeTitle = if (fullTitleText != null) {
+    // Encontra o último hífen no texto completo
+    val lastHyphenIndex = fullTitleText.lastIndexOf("-")
+    if (lastHyphenIndex != -1) {
+        // Pega o texto que vem depois do último hífen
+        fullTitleText.substring(lastHyphenIndex + 1).trim()
+    } else {
+        null
+    }
+} else {
+    null
+}
     val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
     val plot = document.selectFirst("div.sinopse")?.text()
     val episodeNumberText = document.selectFirst("h2#current_ep b")?.text()
-    val episode = episodeNumberText?.toIntOrNull() ?: 1
-    val episodeName = if (!episodeTitle.isNullOrEmpty() && episodeTitle != "N/A") {
+    val episodeText = document.selectFirst("h2#current_ep b")?.text()
+    val episode = episodeText?.toIntOrNull() ?: 1
+    val episodeName = if (episodeTitle != null && episodeTitle != "N/A") {
         "Episódio $episodeNumberText - $episodeTitle"
     } else {
         "Episódio $episodeNumberText"
     }
+    // link para a página principal do anime (pego do <a> do título do episódio)
     val animeUrl = document.selectFirst("div#epinfo h1 a")?.attr("href")
 
     return newAnimeLoadResponse(title, url, TvType.Anime) {
@@ -230,14 +237,21 @@ if (isEpisodePage) {
         addEpisodes(DubStatus.Subbed, listOf(
             newEpisode(url) {
                 this.name = episodeName
+                this.parentUrl=animeUrl
                 this.episode = episode
-                if (animeUrl != null) {
-                    this.parentUrl = fixUrl(animeUrl)
-                }
             }
         ))
+
+        // botão extra "Ver todos os episódios"
+        if (animeUrl != null) {
+            this.recommendations = listOf(
+                newAnimeSearchResponse("Ver todos os episódios", fixUrl(animeUrl), TvType.Anime) {
+                    this.posterUrl = poster
+                }
+            )
+        }
     }
-}else if (isSeriesPage) {
+}  else if (isSeriesPage) {
             val scriptTag = document.selectFirst("script#__NEXT_DATA__")
                 ?: return null
 
