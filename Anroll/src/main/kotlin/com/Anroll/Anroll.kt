@@ -126,19 +126,21 @@ class Anroll : MainAPI() {
         )
     }
 
-    private fun parseLancamentoJson(entry: JSONObject?): SearchResponse? {
+   private fun parseLancamentoJson(entry: JSONObject?): SearchResponse? {
     val episodeData = entry?.optJSONObject("episode") ?: return null
     val animeData = episodeData.optJSONObject("anime") ?: return null
 
     val title = animeData.optString("titulo")
-    val generateId = episodeData.optString("generate_id")
+    val animeSeriesGenId = animeData.optString("generate_id") // ID da série
+    val episodeGenId = episodeData.optString("generate_id") // ID do episódio
     val isDub = animeData.optInt("dub") == 1
     val episodeNumber = episodeData.optString("n_episodio")?.toIntOrNull() ?: 1
     val slug = animeData.optString("slug_serie")
 
-    if (title.isEmpty() || generateId.isEmpty() || slug.isEmpty()) return null
+    if (title.isEmpty() || animeSeriesGenId.isEmpty()) return null
 
-    val url = "$mainUrl/a/$slug#$generateId"
+    // AQUI ESTÁ A CORREÇÃO: Usar o ID da série na URL
+    val url = "$mainUrl/a/$animeSeriesGenId#$episodeGenId"
 
     val posterUrl = if (slug.isNotEmpty()) {
         "https://static.anroll.net/images/animes/screens/$slug/${"%03d".format(episodeNumber)}.jpg"
@@ -151,6 +153,7 @@ class Anroll : MainAPI() {
         this.addDubStatus(isDub, episodeNumber)
     }
 }
+   
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
         val response = app.get(searchUrl)
