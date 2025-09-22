@@ -107,61 +107,72 @@ class DoramasOnline : MainAPI() {
         return items
     }
 
-   override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+ override suspend fun load(url: String): LoadResponse? {
+    val document = app.get(url).document
 
-        val title = document.selectFirst("meta[property=og:title]")?.attr("content") ?: document.title()
-        val plot = document.selectFirst("div.sbox p")?.text()?.trim()
-        val poster = document.selectFirst("meta[property=og:image]")?.attr("content")
-        val type = if (url.contains("/series/")) TvType.TvSeries else TvType.Movie
+    val title = document.selectFirst("meta[property=og:title]")?.attr("content") ?: document.title()
+    val plot = document.selectFirst("div.sbox p")?.text()?.trim()
+    val poster = document.selectFirst("meta[property=og:image]")?.attr("content")
+    val type = if (url.contains("/series/")) TvType.TvSeries else TvType.Movie
 
-        val episodes = mutableListOf<Episode>()
+    val seasons = mutableListOf<SeasonData>()
 
-        if (type == TvType.TvSeries) {
-            val scriptTag = document.selectFirst("script:containsData(dtGonza)")
-            val dtGonzaString = scriptTag?.data() ?: ""
-            val postId = Pattern.compile("(?<=post_id\":)[0-9]+")
-                .matcher(dtGonzaString)
-                .let { if (it.find()) it.group(0) else null }
+    if (type == TvType.TvSeries) {
+        val seasonSections: Elements = document.select("div.se-c")
 
-            if (postId != null) {
-                val apiRequestUrl = "$mainUrl/wp-json/dooplay/v2/?action=dt_episodes&id=$postId"
-                val apiResponse = app.get(apiRequestUrl)
-                val jsonObject = JSONObject(apiResponse.text)
-                val episodesHtml = jsonObject.optString("html")
-                if (episodesHtml != null && episodesHtml.isNotEmpty()) {
-                    val episodeDoc = Jsoup.parse(episodesHtml)
+        for (seasonSection: Element in seasonSections) {
+            val seasonTitle = seasonSection.selectFirst(".title")?.text()?.trim()
+            val episodesList = mutableListOf<Episode>()
+
+            val episodeElements: Elements = seasonSection.select("ul.episodios li")
+
+            for (episodeElement: Element in episodeElements) {
+                val linkTag = episodeElement.selectFirst("a")
+                val titleTag = episodeElement.selectFirst(".episodiotitle a")
+
+                if (linkTag != null && titleTag != null) {
+                    val episodeUrl = linkTag.attr("href")
+                    val episodeName = titleTag.text().trim()
+
+                    // Extrai o número do episódio usando uma expressão regular
+                    val episodeNumberString = Pattern.compile("(\\d+)")
+                        .matcher(episodeName)
+                        .let { if (it.find()) it.group(1) else null }
                     
-                    // A correção foi feita aqui. Agora, o código busca por <li> e extrai os dados dos elementos filhos.
-                    episodeDoc.select("li").forEach { li ->
-                        val link = li.selectFirst("a")
-                        val episodeUrl = link?.attr("href") ?: return@forEach
-                        val episodeNumber = li.selectFirst(".ep-num")?.text()?.toIntOrNull()
-                        val episodeName = li.selectFirst(".ep-title")?.text()
-                        
-                        episodes.add(
-                            newEpisode(episodeUrl) {
-                                name = episodeName
-                                episode = episodeNumber
-                            }
-                        )
-                    }
+                    val episodeNumber = episodeNumberString?.toIntOrNull() ?: 0
+                    
+                    episodesList.add(
+                        newEpisode(episodeUrl) {
+                            name = episodeName
+                            episode = episodeNumber
+                        }
+                    )
                 }
             }
-        }
-
-        return if (type == TvType.Movie) {
-            newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.plot = plot
-                this.posterUrl = fixUrlNull(poster)
-            }
-        } else {
-            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.reversed()) {
-                this.plot = plot
-                this.posterUrl = fixUrlNull(poster)
+            if (episodesList.isNotEmpty()) {
+                seasons.add(
+                    newSeasonData(
+                        seasonTitle,
+                        episodesList
+                    )
+                )
             }
         }
     }
+    
+    // O retorno para séries agora usa a lista de temporadas, não a de episódios
+    return if (type == TvType.Movie) {
+        newMovieLoadResponse(title, url, TvType.Movie, url) {
+            this.plot = plot
+            this.posterUrl = fixUrlNull(poster)
+        }
+    } else {
+        newTvSeriesLoadResponse(title, url, TvType.TvSeries, seasons) {
+            this.plot = plot
+            this.posterUrl = fixUrlNull(poster)
+        }
+    }
+}
 
     // Função para carregar os links de streaming
     override suspend fun loadLinks(
