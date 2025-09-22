@@ -75,12 +75,12 @@ class DoramasOnline : MainAPI() {
         )
     }
 
- override suspend fun search(query: String): List<SearchResult> {
+  override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=${query.replace(" ", "+")}"
         val html = app.get(searchUrl).text
         val document = Jsoup.parse(html)
 
-        val results = mutableListOf<SearchResult>()
+        val results = mutableListOf<SearchResponse>()
         
         // Usa o seletor que funcionou no teste com Python
         document.select("div.result-item").forEach { element ->
@@ -102,7 +102,7 @@ class DoramasOnline : MainAPI() {
                 }
 
                 results.add(
-                    SearchResult(
+                    SearchResponse(
                         title,
                         url,
                         url,
@@ -115,6 +115,7 @@ class DoramasOnline : MainAPI() {
         }
         return results
     }
+  
 override suspend fun load(url: String): LoadResponse? {
     val document = app.get(url).document
 
