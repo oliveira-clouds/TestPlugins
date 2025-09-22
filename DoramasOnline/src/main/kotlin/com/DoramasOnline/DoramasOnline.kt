@@ -89,21 +89,29 @@ class DoramasOnline : MainAPI() {
                 val title = titleElement.text().trim()
                 val url = linkElement.attr("href")
                 val posterUrl = posterElement?.attr("src") ?: ""
-                
-                // Determina o tipo de conteúdo (Série ou Filme)
+        
                 val type = when (typeElement?.classNames()) {
                     setOf("tvshows") -> TvType.TvSeries
                     setOf("movies") -> TvType.Movie
                     else -> TvType.TvSeries
                 }
+                
+                return@mapNotNull if (type == TvType.Movie) {
+                    newMovieSearchResponse(
+                        name = title,
+                        url = url,
+                        apiName = this.name,
+                        posterUrl = posterUrl
+                    )
+                } else {
+                    newTvSeriesSearchResponse(
+                        name = title,
+                        url = url,
+                        apiName = this.name,
+                        posterUrl = posterUrl
+                    )
+                }
 
-                SearchResponse(
-                    name = title,
-                    url = url,
-                    apiName = this.name,
-                    type = type,
-                    posterUrl = posterUrl
-                )
             } else {
                 null
             }
