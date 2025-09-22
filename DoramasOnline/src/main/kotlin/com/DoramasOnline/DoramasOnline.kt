@@ -11,10 +11,10 @@ import org.json.JSONObject
 import java.util.*
 import java.util.regex.Pattern
 
-
+// A classe principal do seu plugin, que herda de MainAPI
 class DoramasOnline : MainAPI() {
 
-   
+    // Define a URL principal, o nome e outros metadados do plugin
     override var mainUrl = "https://doramasonline.org"
     override var name = "Doramas Online"
     override val hasMainPage = true
@@ -23,13 +23,13 @@ class DoramasOnline : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie)
 
-  
+    // Define as categorias da página principal
     override val mainPage = mainPageOf(
         "doramas" to "Doramas",
         "filmes" to "Filmes"
     )
 
- 
+    // Função para carregar os itens da página principal
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = mutableListOf<SearchResponse>()
         var url = ""
@@ -45,7 +45,7 @@ class DoramasOnline : MainAPI() {
 
         val document = app.get(url).document
 
-        
+        // Itera sobre cada item de filme ou dorama
         document.select("article.item").forEach { item ->
             val title = item.selectFirst("h3 a")?.text() ?: return@forEach
             val link = item.selectFirst("h3 a")?.attr("href") ?: return@forEach
@@ -148,12 +148,14 @@ class DoramasOnline : MainAPI() {
         return if (type == TvType.Movie) {
             newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.plot = plot
-                this.posterUrl = fixUrl(poster)
+                // Alteração aqui: usa fixUrlNull para lidar com poster nulo
+                this.posterUrl = fixUrlNull(poster)
             }
         } else {
             newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.reversed()) {
                 this.plot = plot
-                this.posterUrl = fixUrl(poster)
+                // Alteração aqui: usa fixUrlNull para lidar com poster nulo
+                this.posterUrl = fixUrlNull(poster)
             }
         }
     }
@@ -173,7 +175,7 @@ class DoramasOnline : MainAPI() {
             .let { if (it.find()) it.group(0) else null }
 
         if (postId != null) {
-            val apiRequestUrl = "$mainUrl/wp-json/dooplayer/v2/?action=dt_players&post=$postId"
+            val apiRequestUrl = "$mainUrl/wp-json/dooplay/v2/?action=dt_players&post=$postId"
             val apiResponse = app.get(apiRequestUrl)
             val jsonObject = JSONObject(apiResponse.text)
             val playersHtml = jsonObject.optString("html")
