@@ -172,14 +172,16 @@ override suspend fun load(url: String): LoadResponse? {
     }
 }
 
-    // Função para carregar os links de streaming
-    override suspend fun loadLinks(
+   override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
+    
     val mainPageHtml = app.get(data).text
+
+
     val playerUrlMatch = Regex("""<iframe[^>]*src=["'](https?:\/\/[^'"]*doramasonline\.org\/cdn[^'"]*)["']""").find(mainPageHtml)
 
     if (playerUrlMatch == null) {
@@ -191,15 +193,26 @@ override suspend fun load(url: String): LoadResponse? {
     val playerHtml = app.get(playerUrl, headers = mapOf("Referer" to data)).text
 
 
-    val videoUrlMatch = Regex("""file\s*:\s*['"](https?:\/\/[^'"]+)['"]""").find(playerHtml)
+    val videoUrlPatterns = listOf(
+        // Padrão 1: Procura por 'file:' seguido por aspas e a URL
+        Regex("""file\s*:\s*['"](https?:\/\/[^'"]+)['"]"""),
+        // Padrão 2: Procura por um link de vídeo direto (mp4, m3u8) no HTML do player
+        Regex("""(https?:\/\/[^\s'"]+\.(?:mp4|m3u8)(?:\?[^'"]*)?)""")
+    )
+
+    var videoUrl: String? = null
+    for (pattern in videoUrlPatterns) {
+        val match = pattern.find(playerHtml)
+        if (match != null) {
+            videoUrl = match.groupValues[1]
+            break
+        }
+    }
     
-    if (videoUrlMatch == null) {
+    if (videoUrl == null) {
+
         return false
     }
-
-    val videoUrl = videoUrlMatch.groupValues[1]
-    
-    // Invoca a função de callback com o link do vídeo encontrado.
     callback.invoke(
         newExtractorLink(
             "DoramaOnline",
