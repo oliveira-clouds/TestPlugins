@@ -103,11 +103,10 @@ class DoramasOnline : MainAPI() {
 
                 results.add(
                     SearchResponse(
-                        title,
-                        url,
-                        url,
-                        type,
-                        null,
+                        name = title,
+                        url = url,
+                        apiName = this.name,
+                        type = type,
                         posterUrl = posterUrl
                     )
                 )
