@@ -152,9 +152,9 @@ override suspend fun load(url: String): LoadResponse? {
             }
             if (episodesList.isNotEmpty()) {
                 seasons.add(
-                    newSeasonData(
+                    SeasonData(
                         seasonTitle,
-                        episodesList
+                        episodesList.reversed()
                     )
                 )
             }
@@ -165,12 +165,12 @@ override suspend fun load(url: String): LoadResponse? {
     return if (type == TvType.Movie) {
         newMovieLoadResponse(title, url, TvType.Movie, url) {
             this.plot = plot
-            this.posterUrl = fixUrlNull(poster)
+            this.posterUrl = poster
         }
     } else {
         newTvSeriesLoadResponse(title, url, TvType.TvSeries, seasons) {
             this.plot = plot
-            this.posterUrl = fixUrlNull(poster)
+            this.posterUrl = poster
         }
     }
 }
