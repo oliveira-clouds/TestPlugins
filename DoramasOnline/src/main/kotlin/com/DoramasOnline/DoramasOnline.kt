@@ -174,35 +174,41 @@ override suspend fun load(url: String): LoadResponse? {
 
     // Função para carregar os links de streaming
     override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val document = app.get(data).document
-        val scriptTag = document.selectFirst("script:containsData(dtGonza)")
-        val dtGonzaString = scriptTag?.data() ?: ""
-        val postId = Pattern.compile("(?<=post_id\":)[0-9]+")
-            .matcher(dtGonzaString)
-            .let { if (it.find()) it.group(0) else null }
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    val mainPageHtml = app.get(data).text
+    val playerUrlMatch = Regex("""<iframe[^>]*src=["'](https?:\/\/[^'"]*doramasonline\.org\/cdn[^'"]*)["']""").find(mainPageHtml)
 
-        if (postId != null) {
-            val apiRequestUrl = "$mainUrl/wp-json/dooplay/v2/?action=dt_players&post=$postId"
-            val apiResponse = app.get(apiRequestUrl)
-            val jsonObject = JSONObject(apiResponse.text)
-            val playersHtml = jsonObject.optString("html")
-
-            if (playersHtml != null) {
-                val playersDoc = Jsoup.parse(playersHtml)
-                playersDoc.select("iframe").forEach {
-                    val playerUrl = it.attr("src")
-                    if (playerUrl.isNotEmpty()) {
-                        loadExtractor(playerUrl, data, subtitleCallback, callback)
-                    }
-                }
-                return true
-            }
-        }
+    if (playerUrlMatch == null) {
         return false
     }
+
+    val playerUrl = playerUrlMatch.groupValues[1]
+
+    val playerHtml = app.get(playerUrl, headers = mapOf("Referer" to data)).text
+
+
+    val videoUrlMatch = Regex("""file\s*:\s*['"](https?:\/\/[^'"]+)['"]""").find(playerHtml)
+    
+    if (videoUrlMatch == null) {
+        return false
+    }
+
+    val videoUrl = videoUrlMatch.groupValues[1]
+    
+    // Invoca a função de callback com o link do vídeo encontrado.
+    callback.invoke(
+        newExtractorLink(
+            "DoramaOnline",
+            "DoramaOnline",
+            videoUrl,
+            ExtractorLinkType.VIDEO
+        )
+    )
+    
+    return true
+}
 }
