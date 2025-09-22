@@ -75,15 +75,11 @@ class DoramasOnline : MainAPI() {
         )
     }
 
-  override suspend fun search(query: String): List<SearchResponse> {
+ override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=${query.replace(" ", "+")}"
-        val html = app.get(searchUrl).text
-        val document = Jsoup.parse(html)
+        val document = app.get(searchUrl).document
 
-        val results = mutableListOf<SearchResponse>()
-        
-        // Usa o seletor que funcionou no teste com Python
-        document.select("div.result-item").forEach { element ->
+        return document.select("div.result-item").mapNotNull { element ->
             val titleElement = element.selectFirst("div.title a")
             val linkElement = element.selectFirst("div.title a")
             val posterElement = element.selectFirst("img")
@@ -101,18 +97,17 @@ class DoramasOnline : MainAPI() {
                     else -> TvType.TvSeries
                 }
 
-                results.add(
-                    SearchResponse(
-                        name = title,
-                        url = url,
-                        apiName = this.name,
-                        type = type,
-                        posterUrl = posterUrl
-                    )
+                SearchResponse(
+                    name = title,
+                    url = url,
+                    apiName = this.name,
+                    type = type,
+                    posterUrl = posterUrl
                 )
+            } else {
+                null
             }
         }
-        return results
     }
   
 override suspend fun load(url: String): LoadResponse? {
