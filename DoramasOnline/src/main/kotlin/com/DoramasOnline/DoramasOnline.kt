@@ -122,7 +122,8 @@ override suspend fun load(url: String): LoadResponse? {
         val seasonSections: Elements = document.select("div.se-c")
 
         for (seasonSection: Element in seasonSections) {
-            val seasonTitle = seasonSection.selectFirst(".title")?.text()?.trim()
+            val seasonTitle = seasonSection.selectFirst(".title")?.text()?.trim() ?: continue
+            val seasonNumber = Pattern.compile("(\\d+)").matcher(seasonTitle).let { if (it.find()) it.group(1).toIntOrNull() else 0 }
             val episodesList = mutableListOf<Episode>()
 
             val episodeElements: Elements = seasonSection.select("ul.episodios li")
@@ -153,8 +154,9 @@ override suspend fun load(url: String): LoadResponse? {
             if (episodesList.isNotEmpty()) {
                 seasons.add(
                     SeasonData(
-                        seasonTitle,
-                        episodesList.reversed()
+                        seasonNumber,
+                        episodesList.reversed(),
+                        seasonTitle
                     )
                 )
             }
