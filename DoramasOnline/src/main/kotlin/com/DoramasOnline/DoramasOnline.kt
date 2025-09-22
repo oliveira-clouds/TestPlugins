@@ -75,39 +75,46 @@ class DoramasOnline : MainAPI() {
         )
     }
 
-    // Função para realizar a busca por filmes e doramas
-    override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?s=$query"
-        val document = app.get(searchUrl).document
-        val items = mutableListOf<SearchResponse>()
+ override suspend fun search(query: String): List<SearchResult> {
+        val searchUrl = "$mainUrl/?s=${query.replace(" ", "+")}"
+        val html = app.get(searchUrl).text
+        val document = Jsoup.parse(html)
+
+        val results = mutableListOf<SearchResult>()
         
-        // Itera sobre os resultados da busca que estão em 'article.item'
-        document.select("article.item").forEach { item ->
-            val title = item.selectFirst("h3 a")?.text() ?: return@forEach
-            val link = item.selectFirst("h3 a")?.attr("href") ?: return@forEach
-            val posterUrl = item.selectFirst("img")?.attr("src") ?: ""
-            
-            // Determina se o item é uma série ou um filme
-            val type = if (link.contains("/series/")) TvType.TvSeries else TvType.Movie
-            
-            if (link.isNotEmpty()) {
-                items.add(
-                    if (type == TvType.Movie) {
-                        newMovieSearchResponse(title, link, type) {
-                            this.posterUrl = fixUrl(posterUrl)
-                        }
-                    } else {
-                        newTvSeriesSearchResponse(title, link, type) {
-                            this.posterUrl = fixUrl(posterUrl)
-                        }
-                    }
+        // Usa o seletor que funcionou no teste com Python
+        document.select("div.result-item").forEach { element ->
+            val titleElement = element.selectFirst("div.title a")
+            val linkElement = element.selectFirst("div.title a")
+            val posterElement = element.selectFirst("img")
+            val typeElement = element.selectFirst("div.image span")
+
+            if (titleElement != null && linkElement != null) {
+                val title = titleElement.text().trim()
+                val url = linkElement.attr("href")
+                val posterUrl = posterElement?.attr("src") ?: ""
+                
+                // Determina o tipo de conteúdo (Série ou Filme)
+                val type = when (typeElement?.classNames()) {
+                    setOf("tvshows") -> TvType.TvSeries
+                    setOf("movies") -> TvType.Movie
+                    else -> TvType.TvSeries
+                }
+
+                results.add(
+                    SearchResult(
+                        title,
+                        url,
+                        url,
+                        type,
+                        null,
+                        posterUrl = posterUrl
+                    )
                 )
             }
         }
-        
-        return items
+        return results
     }
-
 override suspend fun load(url: String): LoadResponse? {
     val document = app.get(url).document
 
