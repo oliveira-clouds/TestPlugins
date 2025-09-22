@@ -104,12 +104,12 @@ class DoramasOnline : MainAPI() {
         }
     }
 
-    // Função para carregar os detalhes de um filme ou dorama
-    override suspend fun load(url: String): LoadResponse? {
+   override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
         val title = document.selectFirst("meta[property=og:title]")?.attr("content") ?: document.title()
-        val plot = document.selectFirst("meta[name=description]")?.attr("content")
+        // Pega a sinopse do elemento correto, que geralmente está em um div com a classe 'sbox'
+        val plot = document.selectFirst("div.sbox p")?.text()?.trim()
         val poster = document.selectFirst("meta[property=og:image]")?.attr("content")
         val type = if (url.contains("/series/")) TvType.TvSeries else TvType.Movie
 
@@ -128,12 +128,12 @@ class DoramasOnline : MainAPI() {
                 val apiResponse = app.get(apiRequestUrl)
                 val jsonObject = JSONObject(apiResponse.text)
                 val episodesHtml = jsonObject.optString("html")
-                if (episodesHtml != null) {
+                if (episodesHtml != null && episodesHtml.isNotEmpty()) {
                     val episodeDoc = Jsoup.parse(episodesHtml)
-                    episodeDoc.select("li").forEach {
-                        val episodeUrl = it.selectFirst("a")?.attr("href") ?: return@forEach
-                        val episodeNumber = it.selectFirst("a")?.text()?.toIntOrNull() ?: 0
-                        val episodeName = it.selectFirst("a")?.attr("title") ?: ""
+                    episodeDoc.select("li a").forEach {
+                        val episodeUrl = it.attr("href")
+                        val episodeNumber = it.attr("title").replace("Episode ", "").replace("episódio ", "").toIntOrNull()
+                        val episodeName = it.attr("title")
                         episodes.add(
                             newEpisode(episodeUrl) {
                                 name = episodeName
@@ -148,13 +148,11 @@ class DoramasOnline : MainAPI() {
         return if (type == TvType.Movie) {
             newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.plot = plot
-                // Alteração aqui: usa fixUrlNull para lidar com poster nulo
                 this.posterUrl = fixUrlNull(poster)
             }
         } else {
             newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.reversed()) {
                 this.plot = plot
-                // Alteração aqui: usa fixUrlNull para lidar com poster nulo
                 this.posterUrl = fixUrlNull(poster)
             }
         }
