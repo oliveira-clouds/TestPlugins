@@ -123,7 +123,7 @@ override suspend fun load(url: String): LoadResponse? {
 
         for (seasonSection: Element in seasonSections) {
             val seasonTitle = seasonSection.selectFirst(".title")?.text()?.trim() ?: continue
-            val seasonNumber = Pattern.compile("(\\d+)").matcher(seasonTitle).let { if (it.find()) it.group(1).toIntOrNull() else 0 }
+            val seasonNumber = Pattern.compile("(\\d+)").matcher(seasonTitle).let { if (it.find()) it.group(1).toIntOrNull() else null }
             val episodesList = mutableListOf<Episode>()
 
             val episodeElements: Elements = seasonSection.select("ul.episodios li")
@@ -154,23 +154,23 @@ override suspend fun load(url: String): LoadResponse? {
             if (episodesList.isNotEmpty()) {
                 seasons.add(
                     SeasonData(
-                        seasonNumber,
-                        episodesList.reversed(),
-                        seasonTitle
+                        name = seasonTitle,
+                        episodes = episodesList.reversed(),
+                        season = seasonNumber
                     )
                 )
             }
         }
     }
     
-    // O retorno para séries agora usa a lista de temporadas, não a de episódios
+    // O retorno para séries agora usa a lista de temporadas, que é o tipo de dado correto
     return if (type == TvType.Movie) {
         newMovieLoadResponse(title, url, TvType.Movie, url) {
             this.plot = plot
             this.posterUrl = poster
         }
     } else {
-        newTvSeriesLoadResponse(title, url, TvType.TvSeries, seasons) {
+        newTvSeriesLoadResponse(title, url, TvType.TvSeries, seasons = seasons) {
             this.plot = plot
             this.posterUrl = poster
         }
