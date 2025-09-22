@@ -75,7 +75,7 @@ class DoramasOnline : MainAPI() {
         )
     }
 
- override suspend fun search(query: String): List<SearchResponse> {
+  override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=${query.replace(" ", "+")}"
         val document = app.get(searchUrl).document
 
@@ -89,27 +89,23 @@ class DoramasOnline : MainAPI() {
                 val title = titleElement.text().trim()
                 val url = linkElement.attr("href")
                 val posterUrl = posterElement?.attr("src") ?: ""
-        
+                
+                // Determina o tipo de conteúdo (Série ou Filme)
                 val type = when (typeElement?.classNames()) {
                     setOf("tvshows") -> TvType.TvSeries
                     setOf("movies") -> TvType.Movie
                     else -> TvType.TvSeries
                 }
                 
+                // Usa as funções de ajuda para criar a resposta de busca
                 return@mapNotNull if (type == TvType.Movie) {
-                    newMovieSearchResponse(
-                        name = title,
-                        url = url,
-                        apiName = this.name,
-                        posterUrl = posterUrl
-                    )
+                    newMovieSearchResponse(title, url) {
+                        this.posterUrl = posterUrl
+                    }
                 } else {
-                    newTvSeriesSearchResponse(
-                        name = title,
-                        url = url,
-                        apiName = this.name,
-                        posterUrl = posterUrl
-                    )
+                    newTvSeriesSearchResponse(title, url) {
+                        this.posterUrl = posterUrl
+                    }
                 }
 
             } else {
