@@ -224,7 +224,7 @@ class Anroll : MainAPI() {
     val episodeText = document.selectFirst("h2#current_ep b")?.text()
     val episode = episodeText?.toIntOrNull() ?: 1
     val episodeName = if (episodeTitle != null && episodeTitle != "N/A") {
-        "Episódio $episodeNumberText - $episodeTitle"
+        "$episodeTitle"
     } else {
         "Episódio $episodeNumberText"
     }
@@ -290,7 +290,7 @@ class Anroll : MainAPI() {
                                 
                                 episodes.add(
                                     newEpisode("$mainUrl/e/$epGenId") {
-                                        name = if (!epTitle.isNullOrEmpty() && epTitle != "N/A") "Episódio $epNumber - $epTitle " else "Episódio $epNumber"
+                                        name = if (!epTitle.isNullOrEmpty() && epTitle != "N/A") "$epTitle " else "Episódio $epNumber"
                                         episode = epNumber
                                         description = epPlot
                                         posterUrl = episodePoster
