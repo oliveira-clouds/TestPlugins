@@ -76,46 +76,47 @@ class DoramasOnline : MainAPI() {
 
     // Função para realizar a busca por filmes e doramas
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchApiUrl = "$mainUrl/wp-json/dooplay/search/?q=$query"
-        val response = app.get(searchApiUrl)
-        val jsonObject = JSONObject(response.text)
-        val jsonArray = jsonObject.optJSONArray("results") ?: return emptyList()
-
-        return (0 until jsonArray.length()).mapNotNull { i ->
-            val item = jsonArray.optJSONObject(i)
-            val title = item?.optString("title") ?: ""
-            val url = item?.optString("url") ?: ""
-            val type = item?.optString("type")
-            val posterUrl = item?.optString("img") ?: ""
-
-            if (title.isNotEmpty() && url.isNotEmpty()) {
-                if (type == "movie") {
-                    newMovieSearchResponse(title, url, TvType.Movie) {
-                        this.posterUrl = fixUrl(posterUrl)
+        val searchUrl = "$mainUrl/?s=$query"
+        val document = app.get(searchUrl).document
+        val items = mutableListOf<SearchResponse>()
+        
+        // Itera sobre os resultados da busca que estão em 'article.item'
+        document.select("article.item").forEach { item ->
+            val title = item.selectFirst("h3 a")?.text() ?: return@forEach
+            val link = item.selectFirst("h3 a")?.attr("href") ?: return@forEach
+            val posterUrl = item.selectFirst("img")?.attr("src") ?: ""
+            
+            // Determina se o item é uma série ou um filme
+            val type = if (link.contains("/series/")) TvType.TvSeries else TvType.Movie
+            
+            if (link.isNotEmpty()) {
+                items.add(
+                    if (type == TvType.Movie) {
+                        newMovieSearchResponse(title, link, type) {
+                            this.posterUrl = fixUrl(posterUrl)
+                        }
+                    } else {
+                        newTvSeriesSearchResponse(title, link, type) {
+                            this.posterUrl = fixUrl(posterUrl)
+                        }
                     }
-                } else {
-                    newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
-                        this.posterUrl = fixUrl(posterUrl)
-                    }
-                }
-            } else {
-                null
+                )
             }
         }
+        
+        return items
     }
 
    override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
         val title = document.selectFirst("meta[property=og:title]")?.attr("content") ?: document.title()
-        // Pega a sinopse do elemento correto, que geralmente está em um div com a classe 'sbox'
         val plot = document.selectFirst("div.sbox p")?.text()?.trim()
         val poster = document.selectFirst("meta[property=og:image]")?.attr("content")
         val type = if (url.contains("/series/")) TvType.TvSeries else TvType.Movie
 
         val episodes = mutableListOf<Episode>()
 
-        // Se for uma série, busca os episódios na API do site
         if (type == TvType.TvSeries) {
             val scriptTag = document.selectFirst("script:containsData(dtGonza)")
             val dtGonzaString = scriptTag?.data() ?: ""
@@ -130,10 +131,14 @@ class DoramasOnline : MainAPI() {
                 val episodesHtml = jsonObject.optString("html")
                 if (episodesHtml != null && episodesHtml.isNotEmpty()) {
                     val episodeDoc = Jsoup.parse(episodesHtml)
-                    episodeDoc.select("li a").forEach {
-                        val episodeUrl = it.attr("href")
-                        val episodeNumber = it.attr("title").replace("Episode ", "").replace("episódio ", "").toIntOrNull()
-                        val episodeName = it.attr("title")
+                    
+                    // A correção foi feita aqui. Agora, o código busca por <li> e extrai os dados dos elementos filhos.
+                    episodeDoc.select("li").forEach { li ->
+                        val link = li.selectFirst("a")
+                        val episodeUrl = link?.attr("href") ?: return@forEach
+                        val episodeNumber = li.selectFirst(".ep-num")?.text()?.toIntOrNull()
+                        val episodeName = li.selectFirst(".ep-title")?.text()
+                        
                         episodes.add(
                             newEpisode(episodeUrl) {
                                 name = episodeName
