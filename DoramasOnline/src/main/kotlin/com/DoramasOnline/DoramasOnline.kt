@@ -175,35 +175,49 @@ override suspend fun loadLinks(
         
     var foundLinks = false
         
-   
     document.select("div.source-box div.pframe iframe.metaframe.rptss").forEach { iframe ->
         val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
             
-        if (playerUrl.contains("/aviso/")) {
-            try {
-                val decodedUrl = when {
-                    playerUrl.contains("?url=") -> {
-                        URLDecoder.decode(playerUrl.substringAfter("?url=").substringBefore("&"), "UTF-8")
+        // Processa TODOS os tipos de URL
+        when {
+            playerUrl.contains("/aviso/") -> {
+                // URLs /aviso/ precisam ser decodificadas
+                try {
+                    val decodedUrl = when {
+                        playerUrl.contains("?url=") -> {
+                            URLDecoder.decode(playerUrl.substringAfter("?url=").substringBefore("&"), "UTF-8")
+                        }
+                        playerUrl.contains("&url=") -> {
+                            URLDecoder.decode(playerUrl.substringAfter("&url=").substringBefore("&"), "UTF-8")
+                        }
+                        else -> playerUrl // Fallback para URL original
                     }
-                    playerUrl.contains("&url=") -> {
-                        URLDecoder.decode(playerUrl.substringAfter("&url=").substringBefore("&"), "UTF-8")
+                    
+                    if (decodedUrl.startsWith("http")) {
+                        loadExtractor(decodedUrl, data, subtitleCallback, callback)
+                        foundLinks = true
                     }
-                    else -> null
-                }?.takeIf { it.isNotBlank() && it.startsWith("http") }
-                
-                decodedUrl?.let { finalUrl ->
-                    loadExtractor(finalUrl, data, subtitleCallback, callback)
+                } catch (e: Exception) {
+                    // Se der erro, tenta a URL original
+                    loadExtractor(playerUrl, data, subtitleCallback, callback)
                     foundLinks = true
                 }
-            } catch (e: Exception) {
-                // Se der erro, tenta carregar a URL original
+            }
+            playerUrl.contains("csst.online") -> {
+                // URLs diretas do CsstOnline
                 loadExtractor(playerUrl, data, subtitleCallback, callback)
                 foundLinks = true
             }
-        } else {
-            // URLs normais
-            loadExtractor(playerUrl, data, subtitleCallback, callback)
-            foundLinks = true
+            playerUrl.contains("rogeriobetin.com") -> {
+                // URLs do rogeriobetin (novo player encontrado)
+                loadExtractor(playerUrl, data, subtitleCallback, callback)
+                foundLinks = true
+            }
+            else -> {
+                // Qualquer outro player - tenta carregar também
+                loadExtractor(playerUrl, data, subtitleCallback, callback)
+                foundLinks = true
+            }
         }
     }
         
