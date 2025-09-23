@@ -11,6 +11,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import org.json.JSONObject
 import java.util.*
 import java.util.regex.Pattern
+import com.lagradost.cloudstream3.utils.AppUtils.urlDecode
 
 class DoramasOnline : MainAPI() {
     
@@ -24,7 +25,7 @@ class DoramasOnline : MainAPI() {
 
     
     private val avisoExtractor = DoramasOnlineAvisoExtractor()
-    override val extractorApis: List<ExtractorApi> = listOf(avisoExtractor)
+    val extractorApis: List<ExtractorApi> = listOf(avisoExtractor)
 
     override val mainPage = mainPageOf(
         "doramas" to "Doramas",
