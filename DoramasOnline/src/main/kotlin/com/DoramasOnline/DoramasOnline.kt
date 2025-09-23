@@ -171,61 +171,40 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    val document = app.get(data).document
-        
-    val players = document.select("div.source-box div.pframe iframe.metaframe.rptss")
-    var foundLinks = false
-    
-    // Debug: ver quantos players encontrou
-    // println("Encontrados ${players.size} players")
-    
-    players.forEachIndexed { index, iframe ->
-        val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEachIndexed
-        
-        // Para cada player, cria uma task separada
-        try {
-            when {
-                playerUrl.contains("/aviso/") -> {
-                    try {
-                        val decodedUrl = when {
-                            playerUrl.contains("?url=") -> {
-                                URLDecoder.decode(playerUrl.substringAfter("?url=").substringBefore("&"), "UTF-8")
-                            }
-                            playerUrl.contains("&url=") -> {
-                                URLDecoder.decode(playerUrl.substringAfter("&url=").substringBefore("&"), "UTF-8")
-                            }
-                            else -> playerUrl
-                        }
-                        
-                        if (decodedUrl.startsWith("http")) {
-                            // Força o carregamento mesmo sem saber se vai funcionar
-                            loadExtractor(decodedUrl, data, subtitleCallback, callback)
-                        }
-                    } catch (e: Exception) {
-                        loadExtractor(playerUrl, data, subtitleCallback, callback)
-                    }
-                }
-                else -> {
-                    // URLs diretas
-                    loadExtractor(playerUrl, data, subtitleCallback, callback)
-                }
-            }
-            foundLinks = true
-        } catch (e: Exception) {
-            // Continua para o próximo player mesmo se um falhar
-        }
-    }
-    
-    // Se não encontrou nenhum player, tenta fallback
-    if (!foundLinks) {
-        document.select("iframe").forEach { iframe ->
-            val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-            loadExtractor(playerUrl, data, subtitleCallback, callback)
-            foundLinks = true
-        }
-    }
-        
-    return foundLinks
+    // TESTE ALTERNATIVO - Adicione estas linhas:
+    callback.invoke(
+        ExtractorLink(
+            "TESTE 1", 
+            "TESTE 1", 
+            "https://test1.com/video.mp4", 
+            data, 
+            Qualities.Unknown.value, 
+            false, 
+            emptyMap()
+        )
+    )
+    callback.invoke(
+        ExtractorLink(
+            "TESTE 2", 
+            "TESTE 2", 
+            "https://test2.com/video.mp4", 
+            data, 
+            Qualities.Unknown.value, 
+            false, 
+            emptyMap()
+        )
+    )
+    callback.invoke(
+        ExtractorLink(
+            "TESTE 3", 
+            "TESTE 3", 
+            "https://test3.com/video.mp4", 
+            data, 
+            Qualities.Unknown.value, 
+            false, 
+            emptyMap()
+        )
+    )
 }
 }
 
