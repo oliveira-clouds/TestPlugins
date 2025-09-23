@@ -25,7 +25,7 @@ class DoramasOnline : MainAPI() {
 
     
     private val avisoExtractor = DoramasOnlineAvisoExtractor()
-    override val extractorApis = listOf<ExtractorApi>(avisoExtractor)
+    val extractorApis = listOf<ExtractorApi>(avisoExtractor)
 
     override val mainPage = mainPageOf(
         "doramas" to "Doramas",
@@ -198,20 +198,27 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        if (!url.contains("/aviso/")) return
+        AppUtils.log("DoramasOnlineAvisoExtractor: URL recebida -> $url")
+
+        if (!url.contains("/aviso/")) {
+            AppUtils.log("DoramasOnlineAvisoExtractor: Ignorando URL (não contém /aviso/)")
+            return
+        }
 
         try {
-            // Faz a requisição para a página de aviso
-            val response = app.get(url, referer = referer)
             val decodedUrl = url.substringAfter("url=").substringBefore("&poster").let { URLDecoder.decode(it, "UTF-8") }
 
-            // Se conseguiu decodificar, passa a URL real para o loadExtractor padrão
+           
+            AppUtils.log("DoramasOnlineAvisoExtractor: URL decodificada -> $decodedUrl")
+
             if (decodedUrl.isNotBlank()) {
-                // Usa o loadExtractor padrão para processar a URL decodificada
+            
+                AppUtils.log("DoramasOnlineAvisoExtractor: Chamando loadExtractor com -> $decodedUrl")
                 loadExtractor(decodedUrl, url, subtitleCallback, callback)
             }
         } catch (e: Exception) {
-         
+    
+            AppUtils.log("DoramasOnlineAvisoExtractor: Erro -> ${e.message}")
             e.printStackTrace()
         }
     }
