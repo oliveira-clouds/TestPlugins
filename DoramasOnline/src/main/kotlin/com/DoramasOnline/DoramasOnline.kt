@@ -238,6 +238,7 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
         if (!url.contains("/aviso/")) return
         
         try {
+            // Extrai a URL real
             val decodedUrl = when {
                 url.contains("?url=") -> {
                     URLDecoder.decode(url.substringAfter("?url=").substringBefore("&"), "UTF-8")
@@ -245,31 +246,14 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
                 url.contains("&url=") -> {
                     URLDecoder.decode(url.substringAfter("&url=").substringBefore("&"), "UTF-8")
                 }
-                url.contains("v=") -> {
-                    URLDecoder.decode(url.substringAfter("v=").substringBefore("&"), "UTF-8")
-                }
-                else -> {
-                    // Tenta extrair da query string completa
-                    val query = url.substringAfter("?")
-                    val params = query.split("&")
-                    params.find { it.startsWith("url=") }?.substringAfter("url=")?.let {
-                        URLDecoder.decode(it, "UTF-8")
-                    } ?: params.find { it.startsWith("v=") }?.substringAfter("v=")?.let {
-                        URLDecoder.decode(it, "UTF-8")
-                    }
-                }
-            }?.takeIf { it.isNotBlank() && it != url && it.startsWith("http") }
+                else -> return
+            }?.takeIf { it.isNotBlank() && it.startsWith("http") } ?: return
+
+       
+            loadExtractor(decodedUrl, url, subtitleCallback, callback)
             
-            decodedUrl?.let { finalUrl ->
-                if (finalUrl.contains("disneycdn.net") || finalUrl.contains("csst.online") || 
-                    finalUrl.contains("embed") || finalUrl.contains("player")) {
-                    loadExtractor(finalUrl, url, subtitleCallback, callback)
-                } else {
-                    loadExtractor(finalUrl, url, subtitleCallback, callback)
-                }
-            }
         } catch (e: Exception) {
-            // Ignora erros silenciosamente
+            // Ignora erros
         }
     }
 }
