@@ -176,8 +176,8 @@ override suspend fun loadLinks(
         newExtractorLink(
             "TESTE 1",
             "TESTE 1", 
-            "https://test1.com/video.mp4",
-            ExtractorLinkType.GENERIC
+            "https://test1.com/video.m3u8",
+            ExtractorLinkType.M3U8
         ) {
             this.referer = data
         }
@@ -186,8 +186,8 @@ override suspend fun loadLinks(
         newExtractorLink(
             "TESTE 2",
             "TESTE 2",
-            "https://test2.com/video.mp4", 
-            ExtractorLinkType.GENERIC
+            "https://test2.com/video.m3u8", 
+            ExtractorLinkType.M3U8
         ) {
             this.referer = data
         }
@@ -196,8 +196,8 @@ override suspend fun loadLinks(
         newExtractorLink(
             "TESTE 3",
             "TESTE 3", 
-            "https://test3.com/video.mp4",
-            ExtractorLinkType.GENERIC
+            "https://test3.com/video.m3u8",
+            ExtractorLinkType.M3U8
         ) {
             this.referer = data
         }
