@@ -12,7 +12,6 @@ import org.json.JSONObject
 import java.util.*
 import java.util.regex.Pattern
 import java.net.URLDecoder
-import com.lagradost.cloudstream3.utils.AppUtils
 
 class DoramasOnline : MainAPI() {
     
@@ -199,10 +198,10 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        AppUtils.log("DoramasOnlineAvisoExtractor: URL recebida -> $url")
+        logInfo("DoramasOnlineAvisoExtractor: URL recebida -> $url")
 
         if (!url.contains("/aviso/")) {
-            AppUtils.log("DoramasOnlineAvisoExtractor: Ignorando URL (não contém /aviso/)")
+            logInfo("DoramasOnlineAvisoExtractor: Ignorando URL (não contém /aviso/)")
             return
         }
 
@@ -210,16 +209,16 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
             val decodedUrl = url.substringAfter("url=").substringBefore("&poster").let { URLDecoder.decode(it, "UTF-8") }
 
            
-            AppUtils.log("DoramasOnlineAvisoExtractor: URL decodificada -> $decodedUrl")
+            logInfo("DoramasOnlineAvisoExtractor: URL decodificada -> $decodedUrl")
 
             if (decodedUrl.isNotBlank()) {
             
-                AppUtils.log("DoramasOnlineAvisoExtractor: Chamando loadExtractor com -> $decodedUrl")
+                logInfo("DoramasOnlineAvisoExtractor: Chamando loadExtractor com -> $decodedUrl")
                 loadExtractor(decodedUrl, url, subtitleCallback, callback)
             }
         } catch (e: Exception) {
     
-            AppUtils.log("DoramasOnlineAvisoExtractor: Erro -> ${e.message}")
+            logError("DoramasOnlineAvisoExtractor: Erro -> ${e.message}")
             e.printStackTrace()
         }
     }
