@@ -165,26 +165,19 @@ override suspend fun load(url: String): LoadResponse? {
 }
 
 override suspend fun loadLinks(
-    data: String, 
+    data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
     val document = app.get(data).document
 
-    
-document.select("iframe#player").firstOrNull()?.attr("src")?.let { playerUrl ->
-    loadExtractor(playerUrl, data, subtitleCallback, callback)
-}
-
-   // Extrai os links dos servidores alternativos
-document.select("div.player-area-server").forEach { element ->
-    val url = element.attr("data-player-url")
-    val name = element.text()
-    if (url.isNotBlank()) {
-        loadExtractor(url, data, subtitleCallback, callback)
+    document.select("iframe.metaframe.rptss").forEach { iframe ->
+        val playerUrl = iframe.attr("src")
+        if (playerUrl.isNotBlank()) {
+            loadExtractor(playerUrl, data, subtitleCallback, callback)
+        }
     }
-}
 
     return true
 }
