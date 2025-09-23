@@ -22,6 +22,10 @@ class DoramasOnline : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie)
 
+    
+    private val avisoExtractor = DoramasOnlineAvisoExtractor()
+    override val extractorApis: List<ExtractorApi> = listOf(avisoExtractor)
+
     override val mainPage = mainPageOf(
         "doramas" to "Doramas",
         "filmes" to "Filmes"
@@ -180,4 +184,35 @@ override suspend fun loadLinks(
 
     return true
 }
+
+class DoramasOnlineAvisoExtractor : ExtractorApi() {
+    override val name = "DoramasOnlineAviso"
+    override val mainUrl = "https://doramasonline.org"
+    override val requiresReferer = true
+
+    override suspend fun getUrl(
+        url: String,
+        referer: String?,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        if (!url.contains("/aviso/")) return
+
+        try {
+            // Faz a requisição para a página de aviso
+            val response = app.get(url, referer = referer)
+            val decodedUrl = url.substringAfter("url=").substringBefore("&poster").urlDecode()
+
+            // Se conseguiu decodificar, passa a URL real para o loadExtractor padrão
+            if (decodedUrl.isNotBlank()) {
+                // Usa o loadExtractor padrão para processar a URL decodificada
+                loadExtractor(decodedUrl, url, subtitleCallback, callback)
+            }
+        } catch (e: Exception) {
+         
+            e.printStackTrace()
+        }
+    }
+}
+
 }
