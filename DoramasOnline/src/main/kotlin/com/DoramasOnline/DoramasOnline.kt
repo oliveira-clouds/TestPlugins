@@ -198,10 +198,10 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        logInfo("DoramasOnlineAvisoExtractor: URL recebida -> $url")
+        log("DoramasOnlineAvisoExtractor: URL recebida -> $url")
 
         if (!url.contains("/aviso/")) {
-            logInfo("DoramasOnlineAvisoExtractor: Ignorando URL (não contém /aviso/)")
+            log("DoramasOnlineAvisoExtractor: Ignorando URL (não contém /aviso/)")
             return
         }
 
@@ -209,16 +209,16 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
             val decodedUrl = url.substringAfter("url=").substringBefore("&poster").let { URLDecoder.decode(it, "UTF-8") }
 
            
-            logInfo("DoramasOnlineAvisoExtractor: URL decodificada -> $decodedUrl")
+            log("DoramasOnlineAvisoExtractor: URL decodificada -> $decodedUrl")
 
             if (decodedUrl.isNotBlank()) {
             
-                logInfo("DoramasOnlineAvisoExtractor: Chamando loadExtractor com -> $decodedUrl")
+                log("DoramasOnlineAvisoExtractor: Chamando loadExtractor com -> $decodedUrl")
                 loadExtractor(decodedUrl, url, subtitleCallback, callback)
             }
         } catch (e: Exception) {
     
-            logError("DoramasOnlineAvisoExtractor: Erro -> ${e.message}")
+            log("DoramasOnlineAvisoExtractor: Erro -> ${e.message}")
             e.printStackTrace()
         }
     }
