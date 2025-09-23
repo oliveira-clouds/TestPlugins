@@ -224,8 +224,6 @@ override suspend fun loadLinks(
     }
 }
 
-}
-
 class DoramasOnlineAvisoExtractor : ExtractorApi() {
     override val name = "DoramasOnlineAviso"
     override val mainUrl = "https://doramasonline.org"
@@ -270,7 +268,7 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
                 } else {
                     // Para URLs diretas de vídeo, cria link diretamente
                     callback.invoke(
-                        ExtractorLink(
+                        newExtractorLink(
                             name,
                             name,
                             finalUrl,
