@@ -202,6 +202,7 @@ override suspend fun loadLinks(
             this.referer = data
         }
     )
+    return true
 }
 }
 
