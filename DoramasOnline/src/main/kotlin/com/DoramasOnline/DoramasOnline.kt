@@ -12,10 +12,8 @@ import org.json.JSONObject
 import java.util.*
 import java.util.regex.Pattern
 
-// A classe principal do seu plugin, que herda de MainAPI
 class DoramasOnline : MainAPI() {
-
-    // Define a URL principal, o nome e outros metadados do plugin
+    
     override var mainUrl = "https://doramasonline.org"
     override var name = "Doramas Online"
     override val hasMainPage = true
@@ -24,13 +22,11 @@ class DoramasOnline : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie)
 
-    // Define as categorias da página principal
     override val mainPage = mainPageOf(
         "doramas" to "Doramas",
         "filmes" to "Filmes"
     )
 
-    // Função para carregar os itens da página principal
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val items = mutableListOf<SearchResponse>()
         var url = ""
@@ -61,8 +57,7 @@ class DoramasOnline : MainAPI() {
                 )
             }
         }
-
-        // Verifica se há uma próxima página
+        
         val hasNext = document.selectFirst("a.next.page-numbers") != null
 
         return newHomePageResponse(
@@ -90,14 +85,12 @@ class DoramasOnline : MainAPI() {
                 val url = linkElement.attr("href")
                 val posterUrl = posterElement?.attr("src") ?: ""
                 
-                // Determina o tipo de conteúdo (Série ou Filme)
                 val type = when (typeElement?.classNames()) {
                     setOf("tvshows") -> TvType.TvSeries
                     setOf("movies") -> TvType.Movie
                     else -> TvType.TvSeries
                 }
                 
-                // Usa as funções de ajuda para criar a resposta de busca
                 return@mapNotNull if (type == TvType.Movie) {
                     newMovieSearchResponse(title, url) {
                         this.posterUrl = posterUrl
@@ -139,8 +132,7 @@ override suspend fun load(url: String): LoadResponse? {
                 if (linkTag != null && titleTag != null) {
                     val episodeUrl = linkTag.attr("href")
                     val episodeName = titleTag.text().trim()
-
-                    // Extrai o número do episódio usando uma expressão regular
+                    
                     val episodeNumberString = Pattern.compile("(\\d+)")
                         .matcher(episodeName)
                         .let { if (it.find()) it.group(1) else null }
@@ -172,56 +164,35 @@ override suspend fun load(url: String): LoadResponse? {
     }
 }
 
-   override suspend fun loadLinks(
-    data: String,
-    isCasting: Boolean,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-): Boolean {
-    
-    val mainPageHtml = app.get(data).text
+  override suspend fun loadLinks(
+        data: String, 
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val document = app.get(data).document
 
-
-    val playerUrlMatch = Regex("""<iframe[^>]*src=["'](https?:\/\/[^'"]*doramasonline\.org\/cdn[^'"]*)["']""").find(mainPageHtml)
-
-    if (playerUrlMatch == null) {
-        return false
-    }
-
-    val playerUrl = playerUrlMatch.groupValues[1]
-
-    val playerHtml = app.get(playerUrl, headers = mapOf("Referer" to data)).text
-
-
-    val videoUrlPatterns = listOf(
-        // Padrão 1: Procura por 'file:' seguido por aspas e a URL
-        Regex("""file\s*:\s*['"](https?:\/\/[^'"]+)['"]"""),
-        // Padrão 2: Procura por um link de vídeo direto (mp4, m3u8) no HTML do player
-        Regex("""(https?:\/\/[^\s'"]+\.(?:mp4|m3u8)(?:\?[^'"]*)?)""")
-    )
-
-    var videoUrl: String? = null
-    for (pattern in videoUrlPatterns) {
-        val match = pattern.find(playerHtml)
-        if (match != null) {
-            videoUrl = match.groupValues[1]
-            break
+        // Extrai o link do player principal (iframe)
+        document.select("iframe#player").firstOrNull()?.attr("src")?.let {
+            callback(
+                ExtractorLink(
+                    name = "Player Principal",
+                    url = it,
+                    referer = data, 
+                    quality = Qualities.Unknown.value
+                )
+            )
         }
-    }
-    
-    if (videoUrl == null) {
 
-        return false
+        // Extrai os links dos servidores alternativos
+        document.select("div.player-area-server").forEach { element ->
+            val url = element.attr("data-player-url")
+            val name = element.text()
+            if (url.isNotBlank()) {
+                loadExtractor(url, data, subtitleCallback, callback)
+            }
+        }
+
+        return true
     }
-    callback.invoke(
-        newExtractorLink(
-            "DoramaOnline",
-            "DoramaOnline",
-            videoUrl,
-            ExtractorLinkType.VIDEO
-        )
-    )
-    
-    return true
-}
 }
