@@ -11,7 +11,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import org.json.JSONObject
 import java.util.*
 import java.util.regex.Pattern
-import com.lagradost.cloudstream3.utils.AppUtils.urlDecode
+import java.net.URLDecoder
 
 class DoramasOnline : MainAPI() {
     
@@ -203,7 +203,7 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
         try {
             // Faz a requisição para a página de aviso
             val response = app.get(url, referer = referer)
-            val decodedUrl = url.substringAfter("url=").substringBefore("&poster").urlDecode()
+            val decodedUrl = url.substringAfter("url=").substringBefore("&poster").let { URLDecoder.decode(it, "UTF-8") }
 
             // Se conseguiu decodificar, passa a URL real para o loadExtractor padrão
             if (decodedUrl.isNotBlank()) {
