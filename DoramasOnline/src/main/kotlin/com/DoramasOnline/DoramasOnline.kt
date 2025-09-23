@@ -201,7 +201,7 @@ override suspend fun loadLinks(
                         "Player ${index + 1}",
                         "DoramasOnline", 
                         finalUrl,
-                        ExtractorLinkType.VIDEO
+                        ExtractorLinkType.DASH
                     ) {
                         this.referer = data
                     }
