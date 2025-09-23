@@ -176,10 +176,8 @@ override suspend fun loadLinks(
     val players = document.select("div.source-box div.pframe iframe.metaframe.rptss")
     var foundLinks = false
     
-    val playerUrls = mutableListOf<String>()
-    
-    players.forEach { iframe ->
-        val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
+    players.forEachIndexed { index, iframe ->
+        val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEachIndexed
         
         try {
             val finalUrl = if (playerUrl.contains("/aviso/")) {
@@ -197,20 +195,28 @@ override suspend fun loadLinks(
             }
             
             if (finalUrl.startsWith("http")) {
-                playerUrls.add(finalUrl)
+                // Tenta determinar o tipo de link baseado no domínio
+                val linkType = when {
+                    finalUrl.contains("csst.online") -> ExtractorLinkType.M3U8
+                    finalUrl.contains("disneycdn.net") -> ExtractorLinkType.M3U8
+                    finalUrl.contains("rogeriobetin.com") -> ExtractorLinkType.M3U8
+                    else -> ExtractorLinkType.VIDEO
+                }
+                
+                callback.invoke(
+                    newExtractorLink(
+                        "Player ${index + 1}",
+                        "DoramasOnline", 
+                        finalUrl,
+                        linkType
+                    ) {
+                        this.referer = data
+                    }
+                )
+                foundLinks = true
             }
         } catch (e: Exception) {
-            // Adiciona a URL original em caso de erro
-            playerUrls.add(playerUrl)
-        }
-    }
-    
-    playerUrls.forEach { url ->
-        try {
-            loadExtractor(url, data, subtitleCallback, callback)
-            foundLinks = true
-        } catch (e: Exception) {
-            // Ignora erros de extractors individuais
+            // Ignora erros
         }
     }
         
