@@ -184,6 +184,7 @@ override suspend fun loadLinks(
 
     return true
 }
+}
 
 class DoramasOnlineAvisoExtractor : ExtractorApi() {
     override val name = "DoramasOnlineAviso"
@@ -215,4 +216,3 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
     }
 }
 
-}
