@@ -261,21 +261,11 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
             }?.takeIf { it.isNotBlank() && it != url && it.startsWith("http") }
             
             decodedUrl?.let { finalUrl ->
-                // Para URLs de serviços conhecidos, usa loadExtractor
                 if (finalUrl.contains("disneycdn.net") || finalUrl.contains("csst.online") || 
                     finalUrl.contains("embed") || finalUrl.contains("player")) {
                     loadExtractor(finalUrl, url, subtitleCallback, callback)
                 } else {
-                    // Para URLs diretas de vídeo, cria link diretamente
-                    callback.invoke(
-                        newExtractorLink(
-                            name,
-                            name,
-                            finalUrl,
-                            referer = url,
-                            quality = Qualities.Unknown.value
-                        )
-                    )
+                    loadExtractor(finalUrl, url, subtitleCallback, callback)
                 }
             }
         } catch (e: Exception) {
