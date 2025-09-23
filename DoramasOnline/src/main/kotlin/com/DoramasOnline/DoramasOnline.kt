@@ -195,25 +195,23 @@ override suspend fun loadLinks(
             }
             
             if (finalUrl.startsWith("http")) {
-                // Tenta determinar o tipo de link baseado no domínio
-                val linkType = when {
-                    finalUrl.contains("csst.online") -> ExtractorLinkType.M3U8
-                    finalUrl.contains("disneycdn.net") -> ExtractorLinkType.M3U8
-                    finalUrl.contains("rogeriobetin.com") -> ExtractorLinkType.M3U8
-                    else -> ExtractorLinkType.VIDEO
-                }
-                
-                callback.invoke(
-                    newExtractorLink(
-                        "Player ${index + 1}",
-                        "DoramasOnline", 
-                        finalUrl,
-                        linkType
-                    ) {
-                        this.referer = data
+                when {
+                    finalUrl.contains("csst.online") -> {
+                        // CsstOnline - usa loadExtractor como antes
+                        loadExtractor(finalUrl, data, subtitleCallback, callback)
+                        foundLinks = true
                     }
-                )
-                foundLinks = true
+                    finalUrl.contains("rogeriobetin.com") -> {
+                        // RogerioBetin - extrai o M3U8 da página
+                        extractRogerioBetin(finalUrl, data, callback)
+                        foundLinks = true
+                    }
+                    else -> {
+                        // Outros - tenta loadExtractor
+                        loadExtractor(finalUrl, data, subtitleCallback, callback)
+                        foundLinks = true
+                    }
+                }
             }
         } catch (e: Exception) {
             // Ignora erros
@@ -221,6 +219,36 @@ override suspend fun loadLinks(
     }
         
     return foundLinks
+}
+
+private suspend fun extractRogerioBetin(url: String, referer: String, callback: (ExtractorLink) -> Unit) {
+    try {
+        val response = app.get(url)
+        val content = response.text
+        
+        // Procura o M3U8 no JavaScript
+        val m3u8Pattern = """sources:\s*\[\{"file":"([^"]+\.m3u8[^"]*)""".toRegex()
+        val match = m3u8Pattern.find(content)
+        
+        match?.groupValues?.get(1)?.let { m3u8Url ->
+            // Decodifica sequências de escape
+            val cleanUrl = m3u8Url.replace("\\/", "/")
+            
+            callback.invoke(
+                newExtractorLink(
+                    "RogerioBetin",
+                    "RogerioBetin", 
+                    cleanUrl,
+                    ExtractorLinkType.M3U8
+                ) {
+                    this.referer = referer
+                }
+            )
+        }
+    } catch (e: Exception) {
+        // Se não conseguir extrair, fallback para loadExtractor
+        loadExtractor(url, referer, {}, callback)
+    }
 }
 }
 
