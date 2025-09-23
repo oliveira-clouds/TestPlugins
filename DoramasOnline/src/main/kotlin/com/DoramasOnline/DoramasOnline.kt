@@ -172,27 +172,19 @@ override suspend fun loadLinks(
 ): Boolean {
     val document = app.get(data).document
 
-    // Extrai o link do player principal (iframe)
-    document.select("iframe#player").firstOrNull()?.attr("src")?.let {
-        callback(
-            ExtractorLink(
-                source = name,           // <-- ADICIONADO
-                name = "Player Principal",
-                url = it,
-                referer = data, 
-                quality = Qualities.Unknown.value
-            )
-        )
-    }
+    
+document.select("iframe#player").firstOrNull()?.attr("src")?.let { playerUrl ->
+    loadExtractor(playerUrl, data, subtitleCallback, callback)
+}
 
-    // Extrai os links dos servidores alternativos
-    document.select("div.player-area-server").forEach { element ->
-        val url = element.attr("data-player-url")
-        val name = element.text()
-        if (url.isNotBlank()) {
-            loadExtractor(url, data, subtitleCallback, callback)
-        }
+   // Extrai os links dos servidores alternativos
+document.select("div.player-area-server").forEach { element ->
+    val url = element.attr("data-player-url")
+    val name = element.text()
+    if (url.isNotBlank()) {
+        loadExtractor(url, data, subtitleCallback, callback)
     }
+}
 
     return true
 }
