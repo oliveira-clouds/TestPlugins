@@ -164,35 +164,36 @@ override suspend fun load(url: String): LoadResponse? {
     }
 }
 
-  override suspend fun loadLinks(
-        data: String, 
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val document = app.get(data).document
+override suspend fun loadLinks(
+    data: String, 
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    val document = app.get(data).document
 
-        // Extrai o link do player principal (iframe)
-        document.select("iframe#player").firstOrNull()?.attr("src")?.let {
-            callback(
-                ExtractorLink(
-                    name = "Player Principal",
-                    url = it,
-                    referer = data, 
-                    quality = Qualities.Unknown.value
-                )
+    // Extrai o link do player principal (iframe)
+    document.select("iframe#player").firstOrNull()?.attr("src")?.let {
+        callback(
+            ExtractorLink(
+                source = name,           // <-- ADICIONADO
+                name = "Player Principal",
+                url = it,
+                referer = data, 
+                quality = Qualities.Unknown.value
             )
-        }
-
-        // Extrai os links dos servidores alternativos
-        document.select("div.player-area-server").forEach { element ->
-            val url = element.attr("data-player-url")
-            val name = element.text()
-            if (url.isNotBlank()) {
-                loadExtractor(url, data, subtitleCallback, callback)
-            }
-        }
-
-        return true
+        )
     }
+
+    // Extrai os links dos servidores alternativos
+    document.select("div.player-area-server").forEach { element ->
+        val url = element.attr("data-player-url")
+        val name = element.text()
+        if (url.isNotBlank()) {
+            loadExtractor(url, data, subtitleCallback, callback)
+        }
+    }
+
+    return true
+}
 }
