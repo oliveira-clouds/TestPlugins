@@ -173,37 +173,34 @@ override suspend fun loadLinks(
 ): Boolean {
     // TESTE ALTERNATIVO - Adicione estas linhas:
     callback.invoke(
-        ExtractorLink(
+        newExtractorLink(
+            "TESTE 1",
             "TESTE 1", 
-            "TESTE 1", 
-            "https://test1.com/video.mp4", 
-            data, 
-            Qualities.Unknown.value, 
-            false, 
-            emptyMap()
-        )
+            "https://test1.com/video.mp4",
+            ExtractorLinkType.GENERIC
+        ) {
+            this.referer = data
+        }
     )
     callback.invoke(
-        ExtractorLink(
-            "TESTE 2", 
-            "TESTE 2", 
+        newExtractorLink(
+            "TESTE 2",
+            "TESTE 2",
             "https://test2.com/video.mp4", 
-            data, 
-            Qualities.Unknown.value, 
-            false, 
-            emptyMap()
-        )
+            ExtractorLinkType.GENERIC
+        ) {
+            this.referer = data
+        }
     )
     callback.invoke(
-        ExtractorLink(
+        newExtractorLink(
+            "TESTE 3",
             "TESTE 3", 
-            "TESTE 3", 
-            "https://test3.com/video.mp4", 
-            data, 
-            Qualities.Unknown.value, 
-            false, 
-            emptyMap()
-        )
+            "https://test3.com/video.mp4",
+            ExtractorLinkType.GENERIC
+        ) {
+            this.referer = data
+        }
     )
 }
 }
