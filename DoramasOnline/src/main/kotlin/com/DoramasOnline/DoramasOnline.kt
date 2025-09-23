@@ -25,7 +25,7 @@ class DoramasOnline : MainAPI() {
 
     
     private val avisoExtractor = DoramasOnlineAvisoExtractor()
-    val extractorApis: List<ExtractorApi> = listOf(avisoExtractor)
+    override val extractorApis = listOf<ExtractorApi>(avisoExtractor)
 
     override val mainPage = mainPageOf(
         "doramas" to "Doramas",
