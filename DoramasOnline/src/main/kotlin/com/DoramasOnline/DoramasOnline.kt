@@ -12,6 +12,7 @@ import org.json.JSONObject
 import java.util.*
 import java.util.regex.Pattern
 import java.net.URLDecoder
+import com.lagradost.cloudstream3.utils.AppUtils
 
 class DoramasOnline : MainAPI() {
     
