@@ -171,38 +171,49 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    // TESTE ALTERNATIVO - Adicione estas linhas:
-    callback.invoke(
-        newExtractorLink(
-            "TESTE 1",
-            "TESTE 1", 
-            "https://test1.com/video.m3u8",
-            ExtractorLinkType.M3U8
-        ) {
-            this.referer = data
+    val document = app.get(data).document
+        
+    val players = document.select("div.source-box div.pframe iframe.metaframe.rptss")
+    var foundLinks = false
+    
+    players.forEachIndexed { index, iframe ->
+        val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEachIndexed
+        
+        try {
+            val finalUrl = if (playerUrl.contains("/aviso/")) {
+                // Decodifica URLs /aviso/
+                when {
+                    playerUrl.contains("?url=") -> {
+                        URLDecoder.decode(playerUrl.substringAfter("?url=").substringBefore("&"), "UTF-8")
+                    }
+                    playerUrl.contains("&url=") -> {
+                        URLDecoder.decode(playerUrl.substringAfter("&url=").substringBefore("&"), "UTF-8")
+                    }
+                    else -> playerUrl
+                }
+            } else {
+                playerUrl
+            }
+            
+            if (finalUrl.startsWith("http")) {
+                callback.invoke(
+                    newExtractorLink(
+                        "Player ${index + 1}",
+                        "DoramasOnline", 
+                        finalUrl,
+                        ExtractorLinkType.VIDEO
+                    ) {
+                        this.referer = data
+                    }
+                )
+                foundLinks = true
+            }
+        } catch (e: Exception) {
+            // Ignora erros e continua para o próximo player
         }
-    )
-    callback.invoke(
-        newExtractorLink(
-            "TESTE 2",
-            "TESTE 2",
-            "https://test2.com/video.m3u8", 
-            ExtractorLinkType.M3U8
-        ) {
-            this.referer = data
-        }
-    )
-    callback.invoke(
-        newExtractorLink(
-            "TESTE 3",
-            "TESTE 3", 
-            "https://test3.com/video.m3u8",
-            ExtractorLinkType.M3U8
-        ) {
-            this.referer = data
-        }
-    )
-    return true
+    }
+        
+    return foundLinks
 }
 }
 
