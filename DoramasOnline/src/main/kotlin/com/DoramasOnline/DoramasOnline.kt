@@ -176,12 +176,13 @@ override suspend fun loadLinks(
     val players = document.select("div.source-box div.pframe iframe.metaframe.rptss")
     var foundLinks = false
     
-    players.forEachIndexed { index, iframe ->
-        val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEachIndexed
+    val playerUrls = mutableListOf<String>()
+    
+    players.forEach { iframe ->
+        val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
         
         try {
             val finalUrl = if (playerUrl.contains("/aviso/")) {
-                // Decodifica URLs /aviso/
                 when {
                     playerUrl.contains("?url=") -> {
                         URLDecoder.decode(playerUrl.substringAfter("?url=").substringBefore("&"), "UTF-8")
@@ -196,20 +197,20 @@ override suspend fun loadLinks(
             }
             
             if (finalUrl.startsWith("http")) {
-                callback.invoke(
-                    newExtractorLink(
-                        "Player ${index + 1}",
-                        "DoramasOnline", 
-                        finalUrl,
-                        ExtractorLinkType.DASH
-                    ) {
-                        this.referer = data
-                    }
-                )
-                foundLinks = true
+                playerUrls.add(finalUrl)
             }
         } catch (e: Exception) {
-            // Ignora erros e continua para o próximo player
+            // Adiciona a URL original em caso de erro
+            playerUrls.add(playerUrl)
+        }
+    }
+    
+    playerUrls.forEach { url ->
+        try {
+            loadExtractor(url, data, subtitleCallback, callback)
+            foundLinks = true
+        } catch (e: Exception) {
+            // Ignora erros de extractors individuais
         }
     }
         
