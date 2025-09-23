@@ -42,7 +42,6 @@ class DoramasOnline : MainAPI() {
 
         val document = app.get(url).document
 
-        // Itera sobre cada item de filme ou dorama
         document.select("article.item").forEach { item ->
             val title = item.selectFirst("h3 a")?.text() ?: return@forEach
             val link = item.selectFirst("h3 a")?.attr("href") ?: return@forEach
@@ -143,7 +142,7 @@ override suspend fun load(url: String): LoadResponse? {
                         newEpisode(episodeUrl) {
                             name = episodeName
                             episode = episodeNumber
-                            season = seasonNumber // Adiciona o número da temporada ao episódio
+                            season = seasonNumber 
                         }
                     )
                 }
