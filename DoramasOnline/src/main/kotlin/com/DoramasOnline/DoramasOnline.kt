@@ -169,22 +169,61 @@ override suspend fun load(url: String): LoadResponse? {
 }
 
 override suspend fun loadLinks(
-    data: String,
-    isCasting: Boolean,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-): Boolean {
-    val document = app.get(data).document
-
-    document.select("iframe.metaframe.rptss").forEach { iframe ->
-        val playerUrl = iframe.attr("src")
-        if (playerUrl.isNotBlank()) {
-            loadExtractor(playerUrl, data, subtitleCallback, callback)
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val document = app.get(data).document
+        var foundLinks = false
+        
+        // 1. Busca os iframes dentro das divs source-box e pframe
+        val iframes = document.select("div.source-box div.pframe iframe.metaframe.rptss")
+        
+        if (iframes.isNotEmpty()) {
+            iframes.forEach { iframe ->
+                val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
+                if (playerUrl.contains("/aviso/")) {
+                    loadExtractor(playerUrl, data, subtitleCallback, callback)
+                    foundLinks = true
+                } else if (playerUrl.isNotBlank()) {
+                    loadExtractor(playerUrl, data, subtitleCallback, callback)
+                    foundLinks = true
+                }
+            }
         }
+        
+        // 2. Se não encontrou, tenta seletores mais genéricos (fallback)
+        if (!foundLinks) {
+            document.select("iframe.metaframe.rptss").forEach { iframe ->
+                val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
+                
+                if (playerUrl.contains("/aviso/")) {
+                    loadExtractor(playerUrl, data, subtitleCallback, callback)
+                    foundLinks = true
+                } else if (playerUrl.isNotBlank()) {
+                    loadExtractor(playerUrl, data, subtitleCallback, callback)
+                    foundLinks = true
+                }
+            }
+        }
+        
+        // 3. Busca em qualquer iframe como último recurso
+        if (!foundLinks) {
+            document.select("iframe").forEach { iframe ->
+                val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
+                
+                if (playerUrl.contains("/aviso/") || playerUrl.contains("embed") || playerUrl.contains("player")) {
+                    loadExtractor(playerUrl, data, subtitleCallback, callback)
+                    foundLinks = true
+                }
+            }
+        }
+        
+        return foundLinks
     }
-
-    return true
 }
+
 }
 
 class DoramasOnlineAvisoExtractor : ExtractorApi() {
@@ -198,28 +237,51 @@ class DoramasOnlineAvisoExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        println("DoramasOnlineAvisoExtractor: URL recebida -> $url")
-
-        if (!url.contains("/aviso/")) {
-            println("DoramasOnlineAvisoExtractor: Ignorando URL (não contém /aviso/)")
-            return
-        }
-
+        if (!url.contains("/aviso/")) return
+        
         try {
-            val decodedUrl = url.substringAfter("url=").substringBefore("&poster").let { URLDecoder.decode(it, "UTF-8") }
-
-           
-            println("DoramasOnlineAvisoExtractor: URL decodificada -> $decodedUrl")
-
-            if (decodedUrl.isNotBlank()) {
+            val decodedUrl = when {
+                url.contains("?url=") -> {
+                    URLDecoder.decode(url.substringAfter("?url=").substringBefore("&"), "UTF-8")
+                }
+                url.contains("&url=") -> {
+                    URLDecoder.decode(url.substringAfter("&url=").substringBefore("&"), "UTF-8")
+                }
+                url.contains("v=") -> {
+                    URLDecoder.decode(url.substringAfter("v=").substringBefore("&"), "UTF-8")
+                }
+                else -> {
+                    // Tenta extrair da query string completa
+                    val query = url.substringAfter("?")
+                    val params = query.split("&")
+                    params.find { it.startsWith("url=") }?.substringAfter("url=")?.let {
+                        URLDecoder.decode(it, "UTF-8")
+                    } ?: params.find { it.startsWith("v=") }?.substringAfter("v=")?.let {
+                        URLDecoder.decode(it, "UTF-8")
+                    }
+                }
+            }?.takeIf { it.isNotBlank() && it != url && it.startsWith("http") }
             
-                println("DoramasOnlineAvisoExtractor: Chamando loadExtractor com -> $decodedUrl")
-                loadExtractor(decodedUrl, url, subtitleCallback, callback)
+            decodedUrl?.let { finalUrl ->
+                // Para URLs de serviços conhecidos, usa loadExtractor
+                if (finalUrl.contains("disneycdn.net") || finalUrl.contains("csst.online") || 
+                    finalUrl.contains("embed") || finalUrl.contains("player")) {
+                    loadExtractor(finalUrl, url, subtitleCallback, callback)
+                } else {
+                    // Para URLs diretas de vídeo, cria link diretamente
+                    callback.invoke(
+                        ExtractorLink(
+                            name,
+                            name,
+                            finalUrl,
+                            referer = url,
+                            quality = Qualities.Unknown.value
+                        )
+                    )
+                }
             }
         } catch (e: Exception) {
-    
-            println("DoramasOnlineAvisoExtractor: Erro -> ${e.message}")
-            e.printStackTrace()
+            // Ignora erros silenciosamente
         }
     }
 }
