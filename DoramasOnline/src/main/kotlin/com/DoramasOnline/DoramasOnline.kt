@@ -173,51 +173,55 @@ override suspend fun loadLinks(
 ): Boolean {
     val document = app.get(data).document
         
+    val players = document.select("div.source-box div.pframe iframe.metaframe.rptss")
     var foundLinks = false
+    
+    // Debug: ver quantos players encontrou
+    // println("Encontrados ${players.size} players")
+    
+    players.forEachIndexed { index, iframe ->
+        val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEachIndexed
         
-    document.select("div.source-box div.pframe iframe.metaframe.rptss").forEach { iframe ->
-        val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-            
-        // Processa TODOS os tipos de URL
-        when {
-            playerUrl.contains("/aviso/") -> {
-                // URLs /aviso/ precisam ser decodificadas
-                try {
-                    val decodedUrl = when {
-                        playerUrl.contains("?url=") -> {
-                            URLDecoder.decode(playerUrl.substringAfter("?url=").substringBefore("&"), "UTF-8")
+        // Para cada player, cria uma task separada
+        try {
+            when {
+                playerUrl.contains("/aviso/") -> {
+                    try {
+                        val decodedUrl = when {
+                            playerUrl.contains("?url=") -> {
+                                URLDecoder.decode(playerUrl.substringAfter("?url=").substringBefore("&"), "UTF-8")
+                            }
+                            playerUrl.contains("&url=") -> {
+                                URLDecoder.decode(playerUrl.substringAfter("&url=").substringBefore("&"), "UTF-8")
+                            }
+                            else -> playerUrl
                         }
-                        playerUrl.contains("&url=") -> {
-                            URLDecoder.decode(playerUrl.substringAfter("&url=").substringBefore("&"), "UTF-8")
+                        
+                        if (decodedUrl.startsWith("http")) {
+                            // Força o carregamento mesmo sem saber se vai funcionar
+                            loadExtractor(decodedUrl, data, subtitleCallback, callback)
                         }
-                        else -> playerUrl // Fallback para URL original
+                    } catch (e: Exception) {
+                        loadExtractor(playerUrl, data, subtitleCallback, callback)
                     }
-                    
-                    if (decodedUrl.startsWith("http")) {
-                        loadExtractor(decodedUrl, data, subtitleCallback, callback)
-                        foundLinks = true
-                    }
-                } catch (e: Exception) {
-                    // Se der erro, tenta a URL original
+                }
+                else -> {
+                    // URLs diretas
                     loadExtractor(playerUrl, data, subtitleCallback, callback)
-                    foundLinks = true
                 }
             }
-            playerUrl.contains("csst.online") -> {
-                // URLs diretas do CsstOnline
-                loadExtractor(playerUrl, data, subtitleCallback, callback)
-                foundLinks = true
-            }
-            playerUrl.contains("rogeriobetin.com") -> {
-                // URLs do rogeriobetin (novo player encontrado)
-                loadExtractor(playerUrl, data, subtitleCallback, callback)
-                foundLinks = true
-            }
-            else -> {
-                // Qualquer outro player - tenta carregar também
-                loadExtractor(playerUrl, data, subtitleCallback, callback)
-                foundLinks = true
-            }
+            foundLinks = true
+        } catch (e: Exception) {
+            // Continua para o próximo player mesmo se um falhar
+        }
+    }
+    
+    // Se não encontrou nenhum player, tenta fallback
+    if (!foundLinks) {
+        document.select("iframe").forEach { iframe ->
+            val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
+            loadExtractor(playerUrl, data, subtitleCallback, callback)
+            foundLinks = true
         }
     }
         
