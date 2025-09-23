@@ -23,9 +23,6 @@ class DoramasOnline : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie)
 
-    
-    private val avisoExtractor = DoramasOnlineAvisoExtractor()
-    val extractorApis = listOf<ExtractorApi>(avisoExtractor)
 
     override val mainPage = mainPageOf(
         "doramas" to "Doramas",
@@ -169,92 +166,50 @@ override suspend fun load(url: String): LoadResponse? {
 }
 
 override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val document = app.get(data).document
-        var foundLinks = false
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    val document = app.get(data).document
         
-        // 1. Busca os iframes dentro das divs source-box e pframe
-        val iframes = document.select("div.source-box div.pframe iframe.metaframe.rptss")
+    var foundLinks = false
         
-        if (iframes.isNotEmpty()) {
-            iframes.forEach { iframe ->
-                val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-                if (playerUrl.contains("/aviso/")) {
-                    loadExtractor(playerUrl, data, subtitleCallback, callback)
-                    foundLinks = true
-                } else if (playerUrl.isNotBlank()) {
-                    loadExtractor(playerUrl, data, subtitleCallback, callback)
-                    foundLinks = true
-                }
-            }
-        }
-        
-        // 2. Se não encontrou, tenta seletores mais genéricos (fallback)
-        if (!foundLinks) {
-            document.select("iframe.metaframe.rptss").forEach { iframe ->
-                val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-                
-                if (playerUrl.contains("/aviso/")) {
-                    loadExtractor(playerUrl, data, subtitleCallback, callback)
-                    foundLinks = true
-                } else if (playerUrl.isNotBlank()) {
-                    loadExtractor(playerUrl, data, subtitleCallback, callback)
-                    foundLinks = true
-                }
-            }
-        }
-        
-        // 3. Busca em qualquer iframe como último recurso
-        if (!foundLinks) {
-            document.select("iframe").forEach { iframe ->
-                val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-                
-                if (playerUrl.contains("/aviso/") || playerUrl.contains("embed") || playerUrl.contains("player")) {
-                    loadExtractor(playerUrl, data, subtitleCallback, callback)
-                    foundLinks = true
-                }
-            }
-        }
-        
-        return foundLinks
-    }
-}
-
-class DoramasOnlineAvisoExtractor : ExtractorApi() {
-    override val name = "DoramasOnlineAviso"
-    override val mainUrl = "https://doramasonline.org"
-    override val requiresReferer = true
-
-    override suspend fun getUrl(
-        url: String,
-        referer: String?,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        if (!url.contains("/aviso/")) return
-        
-        try {
-            // Extrai a URL real
-            val decodedUrl = when {
-                url.contains("?url=") -> {
-                    URLDecoder.decode(url.substringAfter("?url=").substringBefore("&"), "UTF-8")
-                }
-                url.contains("&url=") -> {
-                    URLDecoder.decode(url.substringAfter("&url=").substringBefore("&"), "UTF-8")
-                }
-                else -> return
-            }?.takeIf { it.isNotBlank() && it.startsWith("http") } ?: return
-
-       
-            loadExtractor(decodedUrl, url, subtitleCallback, callback)
+   
+    document.select("div.source-box div.pframe iframe.metaframe.rptss").forEach { iframe ->
+        val playerUrl = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
             
-        } catch (e: Exception) {
-            // Ignora erros
+        if (playerUrl.contains("/aviso/")) {
+            try {
+                val decodedUrl = when {
+                    playerUrl.contains("?url=") -> {
+                        URLDecoder.decode(playerUrl.substringAfter("?url=").substringBefore("&"), "UTF-8")
+                    }
+                    playerUrl.contains("&url=") -> {
+                        URLDecoder.decode(playerUrl.substringAfter("&url=").substringBefore("&"), "UTF-8")
+                    }
+                    else -> null
+                }?.takeIf { it.isNotBlank() && it.startsWith("http") }
+                
+                decodedUrl?.let { finalUrl ->
+                    loadExtractor(finalUrl, data, subtitleCallback, callback)
+                    foundLinks = true
+                }
+            } catch (e: Exception) {
+                // Se der erro, tenta carregar a URL original
+                loadExtractor(playerUrl, data, subtitleCallback, callback)
+                foundLinks = true
+            }
+        } else {
+            // URLs normais
+            loadExtractor(playerUrl, data, subtitleCallback, callback)
+            foundLinks = true
         }
     }
+        
+    return foundLinks
 }
+}
+
+
 
