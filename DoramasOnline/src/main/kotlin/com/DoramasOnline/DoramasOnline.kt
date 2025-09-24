@@ -197,16 +197,17 @@ override suspend fun loadLinks(
             if (finalUrl.startsWith("http")) {
                 when {
                     finalUrl.contains("csst.online") -> {
-                        // CsstOnline - usa loadExtractor como antes
                         loadExtractor(finalUrl, data, subtitleCallback, callback)
                         foundLinks = true
                     }
                     finalUrl.contains("rogeriobetin.com") -> {
-                        // RogerioBetin - extrai o M3U8 da página
                         extractRogerioBetin(finalUrl, data, callback)
                         foundLinks = true
                     }
-                    else -> {
+                     finalUrl.contains("disneycdn.net") && finalUrl.contains("#") -> {
+                       extractDisneyCDN(finalUrl, data, callback)
+                       foundLinks = true
+                     }  else -> {
                         // Outros - tenta loadExtractor
                         loadExtractor(finalUrl, data, subtitleCallback, callback)
                         foundLinks = true
@@ -249,6 +250,80 @@ private suspend fun extractRogerioBetin(url: String, referer: String, callback: 
         }
     } catch (e: Exception) {
         loadExtractor(url, referer, {}, callback)
+    }
+}
+
+private suspend fun extractDisneyCDN(url: String, referer: String, callback: (ExtractorLink) -> Unit) {
+    try {
+        // Primeiro, tenta acessar a página base sem o #
+        val baseUrl = url.substringBefore("#")
+        val response = app.get(baseUrl, headers = mapOf(
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer" to "https://doramasonline.org/",
+            "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        ))
+        
+        val content = response.text
+        
+        // Procura por padrões comuns de M3U8 em aplicações React
+        val patterns = listOf(
+            """(https://disneycdn\.net/hls/[^"']+\.m3u8)""",
+            """(https://[^"']+\.m3u8)""",
+            """hlsUrl["']?\s*:\s*["']([^"']+)""",
+            """videoUrl["']?\s*:\s*["']([^"']+)""",
+            """src["']?\s*:\s*["']([^"']+\.m3u8)"""
+        )
+        
+        var m3u8Url: String? = null
+        
+        for (pattern in patterns) {
+            val regex = pattern.toRegex()
+            val match = regex.find(content)
+            m3u8Url = match?.groupValues?.get(1)
+            if (m3u8Url != null) break
+        }
+        
+        // Se não encontrou, tenta uma abordagem alternativa
+        if (m3u8Url == null) {
+            // Tenta construir a URL baseada no ID do hash
+            val hashParams = url.substringAfter("#").split("&")
+            val idParam = hashParams.find { it.startsWith("adprs") }?.substringAfter("=")
+            
+            idParam?.let { id ->
+                // Tenta um padrão comum de URL do DisneyCDN
+                val constructedUrl = "https://disneycdn.net/hls/$id/master.m3u8"
+                // Testa se a URL existe
+                try {
+                    app.get(constructedUrl, timeout = 10)
+                    m3u8Url = constructedUrl
+                } catch (e: Exception) {
+                    // Ignora e tenta outro padrão
+                    val alternativeUrl = "https://disneycdn.net/hls/$id/index.m3u8"
+                    try {
+                        app.get(alternativeUrl, timeout = 10)
+                        m3u8Url = alternativeUrl
+                    } catch (e2: Exception) {
+                        // Continua sem URL
+                    }
+                }
+            }
+        }
+        
+        m3u8Url?.let { foundUrl ->
+            callback.invoke(
+                newExtractorLink(
+                    "DisneyCDN",
+                    "DisneyCDN", 
+                    foundUrl,
+                    ExtractorLinkType.M3U8
+                ) {
+                    this.referer = referer
+                }
+            )
+        }
+        
+    } catch (e: Exception) {
+        // Fallback silencioso
     }
 }
 }
