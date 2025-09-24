@@ -226,27 +226,28 @@ private suspend fun extractRogerioBetin(url: String, referer: String, callback: 
         val response = app.get(url)
         val content = response.text
         
-        // Procura o M3U8 no JavaScript
-        val m3u8Pattern = """sources:\s*\[\{"file":"([^"]+\.m3u8[^"]*)""".toRegex()
+        
+        val m3u8Pattern = """sources\s*:\s*\[\s*\{\s*"file"\s*:\s*"([^"]+\.m3u8[^"]*)""".toRegex()
         val match = m3u8Pattern.find(content)
         
-        match?.groupValues?.get(1)?.let { m3u8Url ->
-            // Decodifica sequências de escape
-            val cleanUrl = m3u8Url.replace("\\/", "/")
+        if (match != null) {
+            val m3u8Url = match.groupValues[1].replace("\\/", "/")
             
             callback.invoke(
                 newExtractorLink(
                     "RogerioBetin",
                     "RogerioBetin", 
-                    cleanUrl,
+                    m3u8Url,
                     ExtractorLinkType.M3U8
                 ) {
                     this.referer = referer
                 }
             )
+        } else {
+            // Fallback se não encontrar
+            loadExtractor(url, referer, {}, callback)
         }
     } catch (e: Exception) {
-        // Se não conseguir extrair, fallback para loadExtractor
         loadExtractor(url, referer, {}, callback)
     }
 }
