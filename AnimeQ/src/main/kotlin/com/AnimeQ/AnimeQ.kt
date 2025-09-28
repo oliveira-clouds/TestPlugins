@@ -3,6 +3,7 @@ package com.animeq
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
+import java.util.EnumSet
 
 class AnimeQProvider : MainAPI() {
     override var mainUrl = "https://animeq.blog"
@@ -47,7 +48,7 @@ class AnimeQProvider : MainAPI() {
 
             newAnimeSearchResponse(title, url, TvType.Anime) {
                 this.posterUrl = image
-                dubStatus = if (isDub) DubStatus.Dubbed else DubStatus.Subbed
+                dubStatus = if (isDub) EnumSet.of(DubStatus.Dubbed) else EnumSet.of(DubStatus.Subbed)
             }
         } catch (e: Exception) {
             null
@@ -100,7 +101,8 @@ class AnimeQProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Implementar extração dos links de vídeo aqui
+        // TODO: Implementar extração dos links de vídeo
+        // Por enquanto retorna false para indicar que não há links
         return false
     }
 }
