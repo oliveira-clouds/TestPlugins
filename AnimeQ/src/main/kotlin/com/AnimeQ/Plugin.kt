@@ -1,10 +1,12 @@
-package com.AnimeQ
-import com.lagradost.cloudstream3.plugins.BasePlugin
+package com.lagradost.animeq
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
+import com.lagradost.cloudstream3.plugins.Plugin
+import android.content.Context
 
 @CloudstreamPlugin
-class AnimeQPlugin : BasePlugin() {
-    override fun load() {
-        registerMainAPI(AnimeQ())
+class AnimeQPlugin : Plugin() {
+    override fun load(context: Context) {
+        // All providers should be added in this manner. Please don't edit the providers list directly.
+        registerMainAPI(AnimeQProvider())
     }
 }
