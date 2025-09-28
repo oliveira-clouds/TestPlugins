@@ -1,14 +1,14 @@
-package com.Animeq
+package com.lagradost.animeq
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 
-class AnimeQ : MainAPI() {
+class AnimeQProvider : MainAPI() {
     override var mainUrl = "https://animeq.blog"
     override var name = "AnimeQ"
     override val supportedTypes = setOf(TvType.Anime, TvType.Movie)
-    override val lang = "pt"
+    override var lang = "pt"
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(mainUrl).document
@@ -42,14 +42,13 @@ class AnimeQ : MainAPI() {
             val image = element.selectFirst("img")?.attr("src")
             val series = element.selectFirst("span.serie")?.text()
             
-            AnimeSearchResponse(
-                name = title,
-                url = url,
-                posterUrl = image,
-                type = TvType.Anime,
-                isDub = title.contains("dublado", ignoreCase = true) || 
+            val isDub = title.contains("dublado", ignoreCase = true) || 
                         series?.contains("dublado", ignoreCase = true) == true
-            )
+
+            newAnimeSearchResponse(title, url, TvType.Anime) {
+                this.posterUrl = image
+                dubStatus = if (isDub) DubStatus.Dubbed else DubStatus.Subbed
+            }
         } catch (e: Exception) {
             null
         }
@@ -61,12 +60,9 @@ class AnimeQ : MainAPI() {
             val url = element.selectFirst("h3 a")?.attr("href") ?: return null
             val image = element.selectFirst("img")?.attr("src")
             
-            AnimeSearchResponse(
-                name = title,
-                url = url,
-                posterUrl = image,
-                type = TvType.Anime
-            )
+            newAnimeSearchResponse(title, url, TvType.Anime) {
+                this.posterUrl = image
+            }
         } catch (e: Exception) {
             null
         }
@@ -79,12 +75,9 @@ class AnimeQ : MainAPI() {
             val url = element.selectFirst("h3 a")?.attr("href") ?: return@mapNotNull null
             val image = element.selectFirst("img")?.attr("src")
             
-            AnimeSearchResponse(
-                name = title,
-                url = url,
-                posterUrl = image,
-                type = TvType.Anime
-            )
+            newAnimeSearchResponse(title, url, TvType.Anime) {
+                this.posterUrl = image
+            }
         }
     }
 
@@ -108,7 +101,6 @@ class AnimeQ : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         // Implementar extração dos links de vídeo aqui
-        // Normalmente você precisaria parsear o player do site
         return false
     }
 }
