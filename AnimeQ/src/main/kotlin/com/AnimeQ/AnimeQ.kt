@@ -3,8 +3,6 @@ package com.animeq
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
-import org.jsoup.parser.Parser
-import org.json.JSONObject
 
 class AnimeQProvider : MainAPI() {
     override var mainUrl = "https://animeq.blog"
@@ -64,14 +62,12 @@ class AnimeQProvider : MainAPI() {
             val url = element.selectFirst("h3 a")?.attr("href") ?: return null
             val image = element.selectFirst("img")?.attr("src")
             val series = element.selectFirst("span.serie")?.text()
-            val quality = element.selectFirst("span.quality")?.text()
             
             val isDub = title.contains("dublado", ignoreCase = true) || 
                         series?.contains("dublado", ignoreCase = true) == true
 
             newAnimeSearchResponse(title, url, TvType.Anime) {
                 this.posterUrl = fixUrlNull(image)
-                dubStatus = if (isDub) EnumSet.of(DubStatus.Dubbed) else EnumSet.of(DubStatus.Subbed)
             }
         } catch (e: Exception) {
             null
@@ -83,11 +79,9 @@ class AnimeQProvider : MainAPI() {
             val title = element.selectFirst("h3 a")?.text() ?: return null
             val url = element.selectFirst("h3 a")?.attr("href") ?: return null
             val image = element.selectFirst("img")?.attr("src")
-            val rating = element.selectFirst("div.rating")?.text()?.toFloatOrNull()
             
             newAnimeSearchResponse(title, url, TvType.Anime) {
                 this.posterUrl = fixUrlNull(image)
-                this.rating = rating
             }
         } catch (e: Exception) {
             null
@@ -206,7 +200,7 @@ class AnimeQProvider : MainAPI() {
             val poster = document.selectFirst("div.poster img")?.attr("src")?.let { fixUrlNull(it) }
             val plot = document.selectFirst("div.entry-content")?.text()
             
-            return newMovieLoadResponse(title, url, TvType.Movie) {
+            return newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = poster
                 this.plot = plot
             }
@@ -221,66 +215,7 @@ class AnimeQProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val document = app.get(data).document
-        
-        // Procurar por iframes de vídeo
-        val iframes = document.select("iframe[src]")
-        iframes.forEach { iframe ->
-            val src = iframe.attr("src")
-            if (src.isNotBlank()) {
-                // Adicionar como link externo
-                callback.invoke(
-                    ExtractorLink(
-                        name = "AnimeQ",
-                        source = src,
-                        url = src,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = src.contains(".m3u8"),
-                        referer = mainUrl
-                    )
-                )
-            }
-        }
-        
-        // Procurar por players nativos
-        val videoElements = document.select("video source[src]")
-        videoElements.forEach { video ->
-            val src = video.attr("src")
-            if (src.isNotBlank()) {
-                callback.invoke(
-                    ExtractorLink(
-                        name = "AnimeQ",
-                        source = src,
-                        url = src,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = src.contains(".m3u8"),
-                        referer = mainUrl
-                    )
-                )
-            }
-        }
-        
-        // Procurar por scripts que contenham links de vídeo
-        val scripts = document.select("script")
-        scripts.forEach { script ->
-            val scriptContent = script.html()
-            // Procurar por URLs de vídeo comuns
-            val videoUrls = Regex("(https?:\\/\\/[^\"'\\s]+\\.(mp4|m3u8|mkv|avi))").findAll(scriptContent)
-            videoUrls.forEach { match ->
-                val url = match.value
-                callback.invoke(
-                    ExtractorLink(
-                        name = "AnimeQ",
-                        source = url,
-                        url = url,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = url.contains(".m3u8"),
-                        referer = mainUrl
-                    )
-                )
-            }
-        }
-        
-        return iframes.isNotEmpty() || videoElements.isNotEmpty()
+        // Por enquanto retorna false - podemos implementar depois
+        return false
     }
 }
