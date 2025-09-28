@@ -33,7 +33,7 @@ class AnimeQProvider : MainAPI() {
             home.add(HomePageList("Animes Recentes", recentAnimes))
         }
 
-        return HomePageResponse(home)
+        return newHomePageResponse(home)
     }
 
     private fun parseEpisode(element: Element): AnimeSearchResponse? {
@@ -89,9 +89,26 @@ class AnimeQProvider : MainAPI() {
         val description = document.selectFirst("div.entry-content")?.text()
         val poster = document.selectFirst("div.poster img")?.attr("src")
         
+        // Tentar extrair episódios se for uma página de anime
+        val episodes = document.select("#seasons .episodios li").mapNotNull { epElement ->
+            val epTitle = epElement.selectFirst(".episodiotitle a")?.text()
+            val epUrl = epElement.selectFirst(".episodiotitle a")?.attr("href")
+            val epNumber = epElement.selectFirst(".numerando")?.text()?.filter { it.isDigit() }?.toIntOrNull()
+            
+            if (epTitle != null && epUrl != null) {
+                newEpisode(epUrl) {
+                    this.name = epTitle
+                    this.episode = epNumber
+                }
+            } else {
+                null
+            }
+        }
+        
         return newAnimeLoadResponse(title, url, TvType.Anime) {
             this.posterUrl = poster
             this.plot = description
+            this.episodes = episodes
         }
     }
 
@@ -101,8 +118,44 @@ class AnimeQProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // TODO: Implementar extração dos links de vídeo
-        // Por enquanto retorna false para indicar que não há links
-        return false
+        // Para páginas de episódio, extrair os players
+        val document = app.get(data).document
+        
+        // Procurar por iframes de vídeo
+        val iframes = document.select("iframe[src]")
+        iframes.forEach { iframe ->
+            val src = iframe.attr("src")
+            if (src.isNotBlank()) {
+                // Adicionar como link externo
+                callback.invoke(
+                    ExtractorLink(
+                        name = "AnimeQ",
+                        source = src,
+                        url = src,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = src.contains(".m3u8")
+                    )
+                )
+            }
+        }
+        
+        // Procurar por players nativos
+        val videoElements = document.select("video source[src]")
+        videoElements.forEach { video ->
+            val src = video.attr("src")
+            if (src.isNotBlank()) {
+                callback.invoke(
+                    ExtractorLink(
+                        name = "AnimeQ",
+                        source = src,
+                        url = src,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = src.contains(".m3u8")
+                    )
+                )
+            }
+        }
+        
+        return iframes.isNotEmpty() || videoElements.isNotEmpty()
     }
 }
