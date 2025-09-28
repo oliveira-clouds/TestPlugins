@@ -1,4 +1,4 @@
-package com.lagradost.animeq
+package com.animeq
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
