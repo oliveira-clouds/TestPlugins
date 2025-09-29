@@ -1,4 +1,4 @@
-package com.AnimeQ
+package com.animesdigital
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
@@ -9,7 +9,7 @@ import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
-class AnimeQProvider : MainAPI() {
+class AnimesDigitalProvider : MainAPI() {
     override var mainUrl = "https://animesdigital.org"
     override var name = "Animes Digital"
     override val hasMainPage = true
