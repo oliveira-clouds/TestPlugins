@@ -8,6 +8,7 @@ class AnimesDigitalProvider : MainAPI() {
     override var mainUrl = "https://animesdigital.org"
     override var name = "Animes Digital"
     override val hasMainPage = true
+    override var lang = "pt-br"
     override val supportedTypes = setOf(TvType.Anime)
     override val hasDownloadSupport = true
 
@@ -112,7 +113,7 @@ class AnimesDigitalProvider : MainAPI() {
         }
     }
 
- override suspend fun loadLinks(
+override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
@@ -122,12 +123,12 @@ class AnimesDigitalProvider : MainAPI() {
         
         var foundLinks = false
         
-        // Extrai players disponíveis
+        val episodeNum = data.substringAfterLast("episodio-").toIntOrNull() ?: 1
+        
         document.select(".tab-video").forEach { player ->
             val iframe = player.selectFirst("iframe")
             val iframeSrc = iframe?.attr("src") ?: return@forEach
             
-            // Player 1 - M3U8 direto (MANTIDO)
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
                 m3u8Url?.let { url ->
@@ -145,7 +146,7 @@ class AnimesDigitalProvider : MainAPI() {
                     foundLinks = true
                 }
             }
-            // Player 2 - Link codificado que leva a uma página intermediária (CORRIGIDO)
+            // Player 2 - Link codificado que leva à página intermediária
             else if (iframeSrc.contains("animesdigital.org/aHR0")) {
                 val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
                 
@@ -153,11 +154,10 @@ class AnimesDigitalProvider : MainAPI() {
                     // 2. Acessa a página intermediária.
                     val playerPage = app.get(url).document
                     
-                    // 3. Seleciona TODOS os elementos <iframe> DENTRO do corpo do post
+                    // 3. Seleciona TODOS os iframes de vídeo DENTRO do corpo do post principal.
                     val allIframes = playerPage.select(".post-body iframe[src]")
 
-                    // 4. Usa o número do episódio (episodeNum) para selecionar o iframe correto.
-                    // O índice de um array começa em 0, então Ep1 está no índice 0, Ep10 no índice 9.
+                    // 4. Usa o número do episódio para selecionar o iframe correto (índice é EpNum - 1).
                     val targetIndex = episodeNum - 1
                     
                     // Verifica se o índice é válido e pega o iframe
@@ -182,7 +182,6 @@ class AnimesDigitalProvider : MainAPI() {
 
     private fun extractM3u8Url(iframeSrc: String): String? {
         return try {
-            // Extrai a URL do M3U8 do parâmetro 'd'
             val params = iframeSrc.split("?").last().split("&")
             params.find { it.startsWith("d=") }?.substringAfter("=")?.let { encodedUrl ->
                 java.net.URLDecoder.decode(encodedUrl, "UTF-8")
@@ -193,8 +192,8 @@ class AnimesDigitalProvider : MainAPI() {
     }
 
     private fun decodeAnimesDigitalUrl(iframeSrc: String): String? {
+        // Tenta usar o Base64 do Android (como você estava usando)
         return try {
-            // Remove a parte base e pega o código base64
             val base64Part = iframeSrc.substringAfter("animesdigital.org/").substringBefore("/")
             val decoded = android.util.Base64.decode(base64Part, android.util.Base64.DEFAULT)
             String(decoded)
