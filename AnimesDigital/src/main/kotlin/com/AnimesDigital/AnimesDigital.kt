@@ -150,18 +150,27 @@ class AnimesDigitalProvider : MainAPI() {
                 val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
                 
                 decodedPageUrl?.let { url ->
-                    // 1. Acessa a página intermediária.
+                    // 2. Acessa a página intermediária.
                     val playerPage = app.get(url).document
-
-                    // 2. Procura o iframe final com o link do player/extrator.
-                    // O link final do vídeo estará no 'src' do iframe na página intermediária.
-                    val finalIframeSrc = playerPage.selectFirst("iframe")?.attr("src")
                     
-                    finalIframeSrc?.let { finalLink ->
-                        // 3. Usa o loadExtractor para resolver o link final (embed).
-                        // O referer é a URL da página intermediária, pois é de onde o iframe é carregado.
-                        loadExtractor(finalLink, url, subtitleCallback, callback)
-                        foundLinks = true
+                    // 3. Seleciona TODOS os elementos <iframe> DENTRO do corpo do post
+                    val allIframes = playerPage.select(".post-body iframe[src]")
+
+                    // 4. Usa o número do episódio (episodeNum) para selecionar o iframe correto.
+                    // O índice de um array começa em 0, então Ep1 está no índice 0, Ep10 no índice 9.
+                    val targetIndex = episodeNum - 1
+                    
+                    // Verifica se o índice é válido e pega o iframe
+                    val targetIframe = allIframes.getOrNull(targetIndex)
+                    
+                    val finalLink = targetIframe?.attr("src")
+                    
+                    finalLink?.let { link ->
+                        if (link.isNotBlank()) {
+                            // 5. Usa o loadExtractor no link do player.
+                            loadExtractor(link, url, subtitleCallback, callback)
+                            foundLinks = true
+                        }
                     }
                 }
             }
