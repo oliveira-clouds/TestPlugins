@@ -127,10 +127,14 @@ class AnimesDigitalProvider : MainAPI() {
             val iframe = player.selectFirst("iframe")
             val iframeSrc = iframe?.attr("src") ?: return@forEach
             
+            // Debug: Mostrar URL do iframe
+            println("DEBUG: Iframe URL encontrada: $iframeSrc")
+            
             // Player 1 - M3U8 direto
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
                 m3u8Url?.let { url ->
+                    println("DEBUG: Player 1 M3U8 encontrado: $url")
                     callback.invoke(
                         newExtractorLink(
                             name,
@@ -146,15 +150,15 @@ class AnimesDigitalProvider : MainAPI() {
                 }
             }
             // Player 2 - Link codificado
-            else if (iframeSrc.contains("animesdigital.org/aHR0")) {
+            else if (iframeSrc.contains("animesdigital.org/aHR0") || iframeSrc.contains("/aHR0")) {
                 val decodedUrl = decodeAnimesDigitalUrl(iframeSrc)
                 decodedUrl?.let { url ->
-                    val type = if (url.contains(".mp4")) {
-                        ExtractorLinkType.VIDEO
-                    } else if (url.contains("m3u8")) {
-                        ExtractorLinkType.M3U8
-                    } else {
-                        ExtractorLinkType.VIDEO
+                    println("DEBUG: Player 2 URL decodificada: $url")
+                    
+                    val type = when {
+                        url.contains(".mp4") -> ExtractorLinkType.VIDEO
+                        url.contains("m3u8") -> ExtractorLinkType.M3U8
+                        else -> ExtractorLinkType.VIDEO
                     }
                     
                     callback.invoke(
@@ -169,7 +173,11 @@ class AnimesDigitalProvider : MainAPI() {
                         }
                     )
                     foundLinks = true
+                } ?: run {
+                    println("DEBUG: Falha ao decodificar URL do Player 2")
                 }
+            } else {
+                println("DEBUG: Iframe não reconhecido: $iframeSrc")
             }
         }
         
@@ -179,22 +187,57 @@ class AnimesDigitalProvider : MainAPI() {
     private fun extractM3u8Url(iframeSrc: String): String? {
         return try {
             // Extrai a URL do M3U8 do parâmetro 'd'
-            val params = iframeSrc.split("?").last().split("&")
-            params.find { it.startsWith("d=") }?.substringAfter("=")?.let { encodedUrl ->
+            val urlParams = iframeSrc.substringAfter("?").split("&")
+            val dParam = urlParams.find { it.startsWith("d=") }
+            dParam?.substringAfter("=")?.let { encodedUrl ->
                 java.net.URLDecoder.decode(encodedUrl, "UTF-8")
             }
         } catch (e: Exception) {
+            println("DEBUG: Erro ao extrair M3U8: ${e.message}")
             null
         }
     }
 
     private fun decodeAnimesDigitalUrl(iframeSrc: String): String? {
         return try {
-            // Remove a parte base e pega o código base64
-            val base64Part = iframeSrc.substringAfter("animesdigital.org/").substringBefore("/")
-            val decoded = android.util.Base64.decode(base64Part, android.util.Base64.DEFAULT)
-            String(decoded)
+            // Extrai a parte base64 da URL
+            val base64Part = when {
+                iframeSrc.contains("/aHR0") -> {
+                    // Formato: https://animesdigital.org/aHR0.../25/bg.mp4?p=2&q=...
+                    iframeSrc.substringAfter("/aHR0").substringBefore("/")
+                }
+                iframeSrc.contains("animesdigital.org/aHR0") -> {
+                    // Formato completo
+                    iframeSrc.substringAfter("animesdigital.org/").substringBefore("/")
+                }
+                else -> {
+                    // Tenta encontrar qualquer parte base64
+                    val pattern = "aHR0[^/]+".toRegex()
+                    pattern.find(iframeSrc)?.value
+                }
+            }
+            
+            if (base64Part != null) {
+                // Adiciona o prefixo se necessário
+                val fullBase64 = if (!base64Part.startsWith("aHR0")) "aHR0$base64Part" else base64Part
+                
+                // Decodifica base64
+                val decodedBytes = android.util.Base64.decode(fullBase64, android.util.Base64.DEFAULT)
+                val decodedUrl = String(decodedBytes, Charsets.UTF_8)
+                
+                // Verifica se é uma URL válida
+                if (decodedUrl.startsWith("http")) {
+                    decodedUrl
+                } else {
+                    println("DEBUG: URL decodificada não é válida: $decodedUrl")
+                    null
+                }
+            } else {
+                println("DEBUG: Não encontrou parte base64 na URL")
+                null
+            }
         } catch (e: Exception) {
+            println("DEBUG: Erro ao decodificar URL: ${e.message}")
             null
         }
     }
