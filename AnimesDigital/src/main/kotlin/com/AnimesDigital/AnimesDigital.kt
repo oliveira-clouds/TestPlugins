@@ -112,7 +112,7 @@ class AnimesDigitalProvider : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
+ override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
@@ -127,14 +127,10 @@ class AnimesDigitalProvider : MainAPI() {
             val iframe = player.selectFirst("iframe")
             val iframeSrc = iframe?.attr("src") ?: return@forEach
             
-            // Debug: Mostrar URL do iframe
-            println("DEBUG: Iframe URL encontrada: $iframeSrc")
-            
-            // Player 1 - M3U8 direto
+            // Player 1 - M3U8 direto (MANTIDO)
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
                 m3u8Url?.let { url ->
-                    println("DEBUG: Player 1 M3U8 encontrado: $url")
                     callback.invoke(
                         newExtractorLink(
                             name,
@@ -149,95 +145,51 @@ class AnimesDigitalProvider : MainAPI() {
                     foundLinks = true
                 }
             }
-            // Player 2 - Link codificado
-            else if (iframeSrc.contains("animesdigital.org/aHR0") || iframeSrc.contains("/aHR0")) {
-                val decodedUrl = decodeAnimesDigitalUrl(iframeSrc)
-                decodedUrl?.let { url ->
-                    println("DEBUG: Player 2 URL decodificada: $url")
+            // Player 2 - Link codificado que leva a uma página intermediária (CORRIGIDO)
+            else if (iframeSrc.contains("animesdigital.org/aHR0")) {
+                val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
+                
+                decodedPageUrl?.let { url ->
+                    // 1. Acessa a página intermediária.
+                    val playerPage = app.get(url).document
+
+                    // 2. Procura o iframe final com o link do player/extrator.
+                    // O link final do vídeo estará no 'src' do iframe na página intermediária.
+                    val finalIframeSrc = playerPage.selectFirst("iframe")?.attr("src")
                     
-                    val type = when {
-                        url.contains(".mp4") -> ExtractorLinkType.VIDEO
-                        url.contains("m3u8") -> ExtractorLinkType.M3U8
-                        else -> ExtractorLinkType.VIDEO
+                    finalIframeSrc?.let { finalLink ->
+                        // 3. Usa o loadExtractor para resolver o link final (embed).
+                        // O referer é a URL da página intermediária, pois é de onde o iframe é carregado.
+                        loadExtractor(finalLink, url, subtitleCallback, callback)
+                        foundLinks = true
                     }
-                    
-                    callback.invoke(
-                        newExtractorLink(
-                            name,
-                            "Player 2", 
-                            url,
-                            type
-                        ) {
-                            this.referer = data
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
-                    foundLinks = true
-                } ?: run {
-                    println("DEBUG: Falha ao decodificar URL do Player 2")
                 }
-            } else {
-                println("DEBUG: Iframe não reconhecido: $iframeSrc")
             }
         }
         
         return foundLinks
     }
+    // ====================================================================================
 
     private fun extractM3u8Url(iframeSrc: String): String? {
         return try {
             // Extrai a URL do M3U8 do parâmetro 'd'
-            val urlParams = iframeSrc.substringAfter("?").split("&")
-            val dParam = urlParams.find { it.startsWith("d=") }
-            dParam?.substringAfter("=")?.let { encodedUrl ->
+            val params = iframeSrc.split("?").last().split("&")
+            params.find { it.startsWith("d=") }?.substringAfter("=")?.let { encodedUrl ->
                 java.net.URLDecoder.decode(encodedUrl, "UTF-8")
             }
         } catch (e: Exception) {
-            println("DEBUG: Erro ao extrair M3U8: ${e.message}")
             null
         }
     }
 
     private fun decodeAnimesDigitalUrl(iframeSrc: String): String? {
         return try {
-            // Extrai a parte base64 da URL
-            val base64Part = when {
-                iframeSrc.contains("/aHR0") -> {
-                    // Formato: https://animesdigital.org/aHR0.../25/bg.mp4?p=2&q=...
-                    iframeSrc.substringAfter("/aHR0").substringBefore("/")
-                }
-                iframeSrc.contains("animesdigital.org/aHR0") -> {
-                    // Formato completo
-                    iframeSrc.substringAfter("animesdigital.org/").substringBefore("/")
-                }
-                else -> {
-                    // Tenta encontrar qualquer parte base64
-                    val pattern = "aHR0[^/]+".toRegex()
-                    pattern.find(iframeSrc)?.value
-                }
-            }
-            
-            if (base64Part != null) {
-                // Adiciona o prefixo se necessário
-                val fullBase64 = if (!base64Part.startsWith("aHR0")) "aHR0$base64Part" else base64Part
-                
-                // Decodifica base64
-                val decodedBytes = android.util.Base64.decode(fullBase64, android.util.Base64.DEFAULT)
-                val decodedUrl = String(decodedBytes, Charsets.UTF_8)
-                
-                // Verifica se é uma URL válida
-                if (decodedUrl.startsWith("http")) {
-                    decodedUrl
-                } else {
-                    println("DEBUG: URL decodificada não é válida: $decodedUrl")
-                    null
-                }
-            } else {
-                println("DEBUG: Não encontrou parte base64 na URL")
-                null
-            }
+            // Remove a parte base e pega o código base64
+            val base64Part = iframeSrc.substringAfter("animesdigital.org/").substringBefore("/")
+            val decoded = android.util.Base64.decode(base64Part, android.util.Base64.DEFAULT)
+            String(decoded)
         } catch (e: Exception) {
-            println("DEBUG: Erro ao decodificar URL: ${e.message}")
             null
         }
     }
