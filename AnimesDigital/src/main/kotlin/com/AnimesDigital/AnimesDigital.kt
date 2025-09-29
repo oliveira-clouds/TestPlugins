@@ -41,9 +41,6 @@ class AnimesDigitalProvider : MainAPI() {
         
         return newAnimeSearchResponse(title, href) {
             this.posterUrl = posterUrl
-            if (episode != null) {
-                addEpisode(episode, href)
-            }
         }
     }
 
@@ -73,20 +70,22 @@ class AnimesDigitalProvider : MainAPI() {
         val description = document.selectFirst("meta[property=og:description]")?.attr("content")
         
         // Extrai informações do anime
-        val animeTitle = document.selectFirst(".info span:contains(Anime) + span")?.text() ?: ""
+        val animeTitle = document.selectFirst(".info span:contains(Anime) + span")?.text() ?: title
         val episodeNum = document.selectFirst(".info span:contains(Episódio) + span")?.text()?.toIntOrNull() ?: 1
         
         // Lista de episódios
         val episodes = document.select(".episode_list_episodes_item").map { episodeElement ->
             val epUrl = episodeElement.attr("href")
             val epNum = episodeElement.selectFirst(".episode_list_episodes_num")?.text()?.toIntOrNull() ?: 1
-            Episode(epUrl, "Episódio $epNum", episode = epNum)
+            newEpisode(epUrl) {
+                this.name = "Episódio $epNum"
+                this.episode = epNum
+            }
         }.reversed()
 
-        return newAnimeLoadResponse(animeTitle.ifEmpty { title }, url, TvType.Anime, episodes) {
+        return newAnimeLoadResponse(animeTitle, url, TvType.Anime, episodes) {
             this.posterUrl = poster
             this.plot = description
-            this.episodes = episodes
         }
     }
 
@@ -99,18 +98,24 @@ class AnimesDigitalProvider : MainAPI() {
         val episodes = document.select(".episode_list_episodes_item").map { episodeElement ->
             val epUrl = episodeElement.attr("href")
             val epNum = episodeElement.selectFirst(".episode_list_episodes_num")?.text()?.toIntOrNull() ?: 1
-            Episode(epUrl, "Episódio $epNum", episode = epNum)
+            newEpisode(epUrl) {
+                this.name = "Episódio $epNum"
+                this.episode = epNum
+            }
         }.reversed()
 
         return newAnimeLoadResponse(title, url, TvType.Anime, episodes) {
             this.posterUrl = poster
             this.plot = description
-            this.episodes = episodes
         }
     }
 
-    override suspend fun loadLinks(data: String, isCasting: Boolean): List<ExtractorLink> {
-        val links = mutableListOf<ExtractorLink>()
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
         val document = app.get(data).document
         
         // Extrai players disponíveis
@@ -122,7 +127,7 @@ class AnimesDigitalProvider : MainAPI() {
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
                 m3u8Url?.let { url ->
-                    links.add(
+                    callback.invoke(
                         ExtractorLink(
                             name,
                             "Player FHD",
@@ -139,7 +144,7 @@ class AnimesDigitalProvider : MainAPI() {
                 val decodedUrl = decodeAnimesDigitalUrl(iframeSrc)
                 decodedUrl?.let { url ->
                     if (url.contains(".mp4")) {
-                        links.add(
+                        callback.invoke(
                             ExtractorLink(
                                 name,
                                 "Player 2",
@@ -149,7 +154,7 @@ class AnimesDigitalProvider : MainAPI() {
                             )
                         )
                     } else if (url.contains("m3u8")) {
-                        links.add(
+                        callback.invoke(
                             ExtractorLink(
                                 name,
                                 "Player 2",
@@ -164,7 +169,7 @@ class AnimesDigitalProvider : MainAPI() {
             }
         }
         
-        return links
+        return true
     }
 
     private fun extractM3u8Url(iframeSrc: String): String? {
