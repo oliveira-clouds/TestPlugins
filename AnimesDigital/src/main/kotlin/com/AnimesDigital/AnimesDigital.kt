@@ -136,11 +136,10 @@ class AnimesDigitalProvider : MainAPI() {
                             name,
                             "Player FHD",
                             url,
-                            data,
-                            Qualities.Unknown.value,
-                            type = ExtractorLinkType.M3U8
+                            ExtractorLinkType.M3U8
                         ) {
                             this.referer = data
+                            this.quality = Qualities.Unknown.value
                         }
                     )
                     foundLinks = true
@@ -163,11 +162,10 @@ class AnimesDigitalProvider : MainAPI() {
                             name,
                             "Player 2", 
                             url,
-                            data,
-                            Qualities.Unknown.value,
-                            type = type
+                            type
                         ) {
                             this.referer = data
+                            this.quality = Qualities.Unknown.value
                         }
                     )
                     foundLinks = true
