@@ -1,4 +1,4 @@
-package com.animesdigital
+package com.Animesdigital
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
