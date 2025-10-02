@@ -216,17 +216,27 @@ private fun Element.toSearchResult(): SearchResponse? {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
-        
-        val isEpisode = url.contains("/video/a/")
+    val document = app.get(url).document
+    
+    // Se a URL for de episódio, chama loadEpisode
+    val isEpisode = url.contains("/video/a/")
 
-        if (isEpisode) {
-            return loadEpisode(url, document)
-        } else {
-            return loadAnime(url, document)
-        }
+    if (isEpisode) {
+        return loadEpisode(url, document)
+    } 
+    
+    // Se for URL de detalhes de Anime/Filme
+    return loadAnime(url, document)
+}
+
+
+private fun String?.toStatus(): Int? {
+    return when (this?.lowercase()) {
+        "completo" -> TvSeries.TvSeriesStatus.Completed.ordinal
+        "em lançamento" -> TvSeries.TvSeriesStatus.Ongoing.ordinal
+        else -> null
     }
-
+}
     private suspend fun loadEpisode(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
         val title = document.selectFirst("meta[property=og:title]")?.attr("content") ?: return null
         val poster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
@@ -254,28 +264,84 @@ private fun Element.toSearchResult(): SearchResponse? {
         }
     }
 
-    private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
-        val title = document.selectFirst("h1, h2")?.text() ?: return null
-        val poster = document.selectFirst("img[src*=/uploads/]")?.attr("src")?.let { fixUrlNull(it) }
-        val description = document.selectFirst("meta[property=og:description]")?.attr("content")
-        
-        // Lista de episódios (se disponível na página do anime)
-        val episodes = document.select(".episode_list_episodes_item").mapNotNull { episodeElement ->
-            val epUrl = episodeElement.attr("href")
-            val epNum = episodeElement.selectFirst(".episode_list_episodes_num")?.text()?.toIntOrNull() ?: 1
-            val urlWithIndex = "$epUrl|#|$epNum"
-            newEpisode(urlWithIndex) {
-                this.name = "Episódio $epNum"
-                this.episode = epNum
-            }
-        }.reversed()
+   private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
+    // Container principal de informações
+    val infoContainer = document.selectFirst(".single_anime, .single-content") ?: document
 
-        return newAnimeLoadResponse(title, url, TvType.Anime) {
-            this.posterUrl = poster
-            this.plot = description
-            addEpisodes(DubStatus.Subbed, episodes)
-        }
+    // 1. EXTRAÇÃO DE METADADOS
+    
+    // Título
+    val title = infoContainer.selectFirst("h1.single-title, h1")?.text()?.trim() 
+        ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.substringBefore(" - Animes Online")?.trim()
+        ?: document.selectFirst("h1, h2")?.text() ?: return null
+
+    // Poster
+    val poster = infoContainer.selectFirst(".foto img")?.attr("src") 
+        ?: document.selectFirst("img[src*=/uploads/]")?.attr("src") 
+        ?: document.selectFirst("meta[property=og:image]")?.attr("content")
+    val posterUrl = fixUrlNull(poster)
+    
+    // Sinopse
+    val description = infoContainer.selectFirst(".sinopse p")?.text()?.trim() 
+        ?: document.selectFirst("meta[property=og:description]")?.attr("content")
+
+    // Tags
+    val tags = infoContainer.select(".generos a, .single-meta a[href*='genero']").map { it.text().trim() }
+    
+    // Status
+    val statusText = infoContainer.selectFirst(".status span")?.text()?.trim()
+    val status = statusText.toStatus()
+
+    // Determinar o TvType (Filme ou Anime)
+    val tvType = if (url.contains("/filmes/", ignoreCase = true)) TvType.Movie else TvType.Anime
+    
+    // Determinar o DubStatus padrão da página
+    val defaultDubStatus = when {
+        url.contains("dublado", ignoreCase = true) || url.contains("desenhos", ignoreCase = true) -> DubStatus.Dubbed
+        else -> DubStatus.Subbed
     }
+
+    // 2. EXTRAÇÃO DE EPISÓDIOS (CORREÇÃO FINAL)
+    
+    // Seletor correto para a lista de episódios
+    val episodes = document.select("#lista_de_episodios a") 
+        .mapNotNull { epElement ->
+            val epUrl = epElement.attr("href")
+            val epTitle = epElement.text().trim()
+            
+            if (epUrl.isNotEmpty() && epTitle.isNotEmpty()) {
+                // Extrai o número do episódio
+                val epNumMatch = Regex("Episódio\\s+(\\d+)|Cap\\.\\s+(\\d+)|(\\d+)").find(epTitle)
+                val episodeNumber = epNumMatch?.groupValues?.lastOrNull()?.toFloatOrNull() ?: 0f
+                
+                val urlWithIndex = "$epUrl|#|$episodeNumber" 
+                
+                newEpisode(urlWithIndex) {
+                    this.name = epTitle
+                    this.episode = episodeNumber
+                    this.dubStatus = defaultDubStatus
+                }
+            } else null
+        }
+        .reversed() // Inverte para ter a ordem 1, 2, 3...
+
+    // 3. SEPARAÇÃO E RETORNO FINAL
+    
+    val dubEpisodes = episodes.filter { it.dubStatus == DubStatus.Dubbed }
+    val subEpisodes = episodes.filter { it.dubStatus == DubStatus.Subbed }
+
+    return newAnimeLoadResponse(title, url, tvType) {
+        this.posterUrl = posterUrl
+        this.plot = description
+        this.tags = tags
+        this.status = status
+        
+        // Adiciona os episódios na aba correta (Dublado/Legendado)
+        if (dubEpisodes.isNotEmpty()) addEpisodes(DubStatus.Dubbed, dubEpisodes)
+        if (subEpisodes.isNotEmpty()) addEpisodes(DubStatus.Subbed, subEpisodes)
+
+    }
+}
 
 override suspend fun loadLinks(
     data: String,
