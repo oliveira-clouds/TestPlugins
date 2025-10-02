@@ -227,9 +227,10 @@ class AnimesDigitalProvider : MainAPI() {
     }
 
     private fun String?.toStatus(): Int? {
-        return when (this?.lowercase()) {
-            "completo" -> TvType.TvSeriesStatus.Completed.ordinal
-            "em lançamento" -> TvType.TvSeriesStatus.Ongoing.ordinal
+        val statusText = this?.lowercase() ?: return null
+        return when {
+            statusText.contains("completo") -> 2 // Completed
+            statusText.contains("em lançamento") -> 1 // Ongoing
             else -> null
         }
     }
@@ -266,7 +267,9 @@ class AnimesDigitalProvider : MainAPI() {
 
         // EXTRAÇÃO DE METADADOS
         val title = infoContainer.selectFirst("h1.single-title, h1")?.text()?.trim() 
-            ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.substringBefore(" - Animes Online")?.trim()
+            ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.let { 
+                it.substringBefore(" - Animes Online").trim() 
+            }
             ?: document.selectFirst("h1, h2")?.text() ?: return null
 
         val poster = infoContainer.selectFirst(".foto img")?.attr("src") 
@@ -310,17 +313,17 @@ class AnimesDigitalProvider : MainAPI() {
             .reversed()
 
         val dubEpisodes = episodes.filter { 
-            epTitle -> epTitle.name.contains("dublado", ignoreCase = true) || defaultDubStatus == DubStatus.Dubbed 
+            it.name.contains("dublado", ignoreCase = true) || defaultDubStatus == DubStatus.Dubbed 
         }
         val subEpisodes = episodes.filter { 
-            epTitle -> !epTitle.name.contains("dublado", ignoreCase = true) || defaultDubStatus == DubStatus.Subbed 
+            !it.name.contains("dublado", ignoreCase = true) || defaultDubStatus == DubStatus.Subbed 
         }
 
         return newAnimeLoadResponse(title, url, tvType) {
             this.posterUrl = posterUrl
             this.plot = description
             this.tags = tags
-            this.status = status 
+            // Removido status pois não é uma propriedade válida
 
             if (dubEpisodes.isNotEmpty()) addEpisodes(DubStatus.Dubbed, dubEpisodes)
             if (subEpisodes.isNotEmpty()) addEpisodes(DubStatus.Subbed, subEpisodes)
