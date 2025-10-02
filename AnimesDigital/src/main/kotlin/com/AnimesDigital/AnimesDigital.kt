@@ -296,41 +296,50 @@ class AnimesDigitalProvider : MainAPI() {
             else -> DubStatus.Subbed
         }
 
-        // EXTRAÇÃO DE EPISÓDIOS
-        val episodes = document.select("#lista_de_episodios a") 
-            .mapNotNull { epElement ->
-                val epUrl = epElement.attr("href")
-                val epTitle = epElement.text().trim()
-                
-                if (epUrl.isNotEmpty() && epTitle.isNotEmpty()) {
-                    val epNumMatch = Regex("Episódio\\s+(\\d+)|Cap\\.\\s+(\\d+)|(\\d+)").find(epTitle)
-                    val episodeNumber = epNumMatch?.groupValues?.lastOrNull()?.toIntOrNull() ?: 0 
-                    
-                    val urlWithIndex = "$epUrl|#|$episodeNumber" 
-                    
-                    newEpisode(urlWithIndex) {
-                        this.name = epTitle
-                        this.episode = episodeNumber
-                    }
-                } else null
+       val episodesList = document.select(".item_ep")
+
+val episodes = episodesList.mapNotNull { epContainer ->
+    // 1. Encontrar a tag <a> dentro do .item_ep
+    val epElement = epContainer.selectFirst("a")
+
+    if (epElement != null) {
+        // 2. Extrair o link (href) da tag <a>
+        val epUrl = epElement.attr("href")
+
+        // 3. Extrair o título da sub-tag com classe .title_anime
+        val titleElement = epElement.selectFirst(".title_anime")
+        val epTitle = titleElement?.text()?.trim() ?: ""
+
+        if (epUrl.isNotEmpty() && epTitle.isNotEmpty()) {
+            val epNumMatch = Regex("Episódio\\s+(\\d+)|Cap\\.\\s+(\\d+)|(\\d+)").find(epTitle)
+            val episodeNumber = epNumMatch?.groupValues?.lastOrNull()?.toIntOrNull() ?: 0
+
+            val urlWithIndex = "$epUrl|#|$episodeNumber"
+
+            newEpisode(urlWithIndex) {
+                this.name = epTitle
+                this.episode = episodeNumber
             }
-            .reversed()
+        } else null
+    } else null
+}
+.reversed()
 
-        val dubEpisodes = episodes.filter { episode ->
-            episode.name?.contains("dublado", ignoreCase = true) == true || defaultDubStatus == DubStatus.Dubbed 
-        }
-        val subEpisodes = episodes.filter { episode ->
-            episode.name?.contains("dublado", ignoreCase = true) != true || defaultDubStatus == DubStatus.Subbed 
-        }
+val dubEpisodes = episodes.filter { episode ->
+    episode.name?.contains("dublado", ignoreCase = true) == true || defaultDubStatus == DubStatus.Dubbed
+}
+val subEpisodes = episodes.filter { episode ->
+    episode.name?.contains("dublado", ignoreCase = true) != true || defaultDubStatus == DubStatus.Subbed
+}
 
-        return newAnimeLoadResponse(title, url, tvType) {
-            this.posterUrl = posterUrl
-            this.plot = description
-            this.tags = tags
+return newAnimeLoadResponse(title, url, tvType) {
+    this.posterUrl = posterUrl
+    this.plot = description
+    this.tags = tags
 
-            if (dubEpisodes.isNotEmpty()) addEpisodes(DubStatus.Dubbed, dubEpisodes)
-            if (subEpisodes.isNotEmpty()) addEpisodes(DubStatus.Subbed, subEpisodes)
-        }
+    if (dubEpisodes.isNotEmpty()) addEpisodes(DubStatus.Dubbed, dubEpisodes)
+    if (subEpisodes.isNotEmpty()) addEpisodes(DubStatus.Subbed, subEpisodes)
+     }
     }
 
     override suspend fun loadLinks(
