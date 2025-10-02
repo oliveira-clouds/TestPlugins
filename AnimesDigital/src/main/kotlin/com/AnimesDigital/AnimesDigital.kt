@@ -13,8 +13,8 @@ class AnimesDigitalProvider : MainAPI() {
     override val hasDownloadSupport = true
 
     override val mainPage = mainPageOf(
+         "$mainUrl/lancamentos" to "Últimos Episódios",
         "$mainUrl/animes-legendados-online" to "Animes Legendados", 
-        "$mainUrl/lancamentos" to "Últimos Episódios",
         "$mainUrl/animes-dublado" to "Animes Dublados",
         "$mainUrl/filmes" to "Filmes",
         "$mainUrl/desenhos-online" to "Desenhos"
