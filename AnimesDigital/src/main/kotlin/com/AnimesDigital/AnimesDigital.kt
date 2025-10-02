@@ -22,7 +22,7 @@ class AnimesDigitalProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(request.data).document
-        val home = document.select("div.itemE, div.itemA").mapNotNull {
+        val home = document.select("div.itemE, div.itemA, div#animePost .itemA, div.list-animes .itemE").mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(
@@ -78,7 +78,8 @@ class AnimesDigitalProvider : MainAPI() {
         val episodes = document.select(".episode_list_episodes_item").mapNotNull { episodeElement ->
             val epUrl = episodeElement.attr("href")
             val epNum = episodeElement.selectFirst(".episode_list_episodes_num")?.text()?.toIntOrNull() ?: 1
-            newEpisode(epUrl) {
+            val urlWithIndex = "$epUrl|#|$epNum" 
+            newEpisode(urlWithIndex) {
                 this.name = "Episódio $epNum"
                 this.episode = epNum
             }
@@ -100,7 +101,8 @@ class AnimesDigitalProvider : MainAPI() {
         val episodes = document.select(".episode_list_episodes_item").mapNotNull { episodeElement ->
             val epUrl = episodeElement.attr("href")
             val epNum = episodeElement.selectFirst(".episode_list_episodes_num")?.text()?.toIntOrNull() ?: 1
-            newEpisode(epUrl) {
+            val urlWithIndex = "$epUrl|#|$epNum"
+            newEpisode(urlWithIndex) {
                 this.name = "Episódio $epNum"
                 this.episode = epNum
             }
@@ -114,70 +116,70 @@ class AnimesDigitalProvider : MainAPI() {
     }
 
 override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val document = app.get(data).document
-        
-        var foundLinks = false
-        
-        val episodeNum = data.substringAfterLast("episodio-").toIntOrNull() ?: 1
-        
-        document.select(".tab-video").forEach { player ->
-            val iframe = player.selectFirst("iframe")
-            val iframeSrc = iframe?.attr("src") ?: return@forEach
-            
-            if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
-                val m3u8Url = extractM3u8Url(iframeSrc)
-                m3u8Url?.let { url ->
-                    callback.invoke(
-                        newExtractorLink(
-                            name,
-                            "Player FHD",
-                            url,
-                            ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = data
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
-                    foundLinks = true
-                }
-            }
-            // Player 2 - Link codificado que leva à página intermediária
-            else if (iframeSrc.contains("animesdigital.org/aHR0")) {
-                val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
-                
-                decodedPageUrl?.let { url ->
-                    // 2. Acessa a página intermediária.
-                    val playerPage = app.get(url).document
-                    
-                    // 3. Seleciona TODOS os iframes de vídeo DENTRO do corpo do post principal.
-                    val allIframes = playerPage.select(".post-body iframe[src]")
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    var foundLinks = false
+    
+    // 1. Extrai a URL real E o número sequencial (episodeNum)
+    val parts = data.split("|#|")
+    val realUrl = parts[0] // A URL real (ex: https://animesdigital.org/video/a/128280/)
+    val episodeNum = parts.getOrNull(1)?.toIntOrNull() ?: 1 // O número sequencial (ex: 10)
 
-                    // 4. Usa o número do episódio para selecionar o iframe correto (índice é EpNum - 1).
-                    val targetIndex = episodeNum - 1
-                    
-                    // Verifica se o índice é válido e pega o iframe
-                    val targetIframe = allIframes.getOrNull(targetIndex)
-                    
-                    val finalLink = targetIframe?.attr("src")
-                    
-                    finalLink?.let { link ->
-                        if (link.isNotBlank()) {
-                            // 5. Usa o loadExtractor no link do player.
-                            loadExtractor(link, url, subtitleCallback, callback)
-                            foundLinks = true
-                        }
+    val document = app.get(realUrl).document // Usamos a URL real para buscar players
+    
+    document.select(".tab-video").forEach { player ->
+        val iframe = player.selectFirst("iframe")
+        val iframeSrc = iframe?.attr("src") ?: return@forEach
+        
+        // Player 1 (MANTIDO)
+        if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
+            val m3u8Url = extractM3u8Url(iframeSrc)
+            m3u8Url?.let { url ->
+                callback.invoke(
+                    newExtractorLink(
+                        name, "Player FHD", url, ExtractorLinkType.M3U8
+                    ) {
+                        this.referer = realUrl 
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+                foundLinks = true
+            }
+        }
+        // Player 2 - Link codificado
+        else if (iframeSrc.contains("animesdigital.org/aHR0")) {
+            val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
+            
+            decodedPageUrl?.let { url ->
+                val playerPage = app.get(url).document
+                
+                // 2. Seleciona TODOS os iframes no corpo do post.
+                val allIframes = playerPage.select(".post-body iframe[src]")
+
+                // 3. Define o índice alvo (Episódio 10 = índice 9).
+                val targetIndex = episodeNum - 1
+                
+                // 4. Seleciona o iframe correto usando o índice.
+                val targetIframe = allIframes.getOrNull(targetIndex)
+                
+                val finalLink = targetIframe?.attr("src")
+                
+                finalLink?.let { link ->
+                    if (link.isNotBlank()) {
+                        // 5. Carrega o link do player específico.
+                        loadExtractor(link, url, subtitleCallback, callback)
+                        foundLinks = true
                     }
                 }
             }
         }
-        
-        return foundLinks
     }
+    
+    return foundLinks
+}
     // ====================================================================================
 
     private fun extractM3u8Url(iframeSrc: String): String? {
