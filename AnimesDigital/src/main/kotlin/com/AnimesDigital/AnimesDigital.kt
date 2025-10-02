@@ -21,30 +21,112 @@ class AnimesDigitalProvider : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = app.get(request.data).document
-        val home = document.select(".itemE, .itemA").mapNotNull {
-            it.toSearchResult()
+    return when {
+        request.data.contains("lancamentos") -> {
+            // Página de lançamentos (funciona com o código atual)
+            val document = app.get(request.data).document
+            val home = document.select(".itemE, .itemA").mapNotNull {
+                it.toSearchResult()
+            }
+            newHomePageResponse(
+                list = HomePageList(
+                    name = request.name,
+                    list = home,
+                    isHorizontalImages = false
+                ),
+                hasNext = false
+            )
         }
+        else -> {
+            // Para outras categorias, usar a API
+            getAnimesFromAPI(page, request)
+        }
+    }
+}
+
+private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomePageResponse {
+    val type = when {
+        request.data.contains("animes-dublado") -> "dublado"
+        request.data.contains("animes-legendados") -> "legendado" 
+        request.data.contains("filmes") -> "filmes"
+        request.data.contains("desenhos") -> "desenhos"
+        else -> "animes"
+    }
+
+    // Parâmetros baseados na requisição que você encontrou
+    val body = mapOf(
+        "token" to "c1deb78cd4",
+        "pagina" to page.toString(),
+        "search" to "0",
+        "limit" to "30",
+        "type" to "lista",
+        "filters" to """{"filter_data":"filter_letter=0&type_url=$type&filter_audio=$type&filter_order=name","filter_genre_add":[],"filter_genre_del":[]}"""
+    )
+
+    try {
+        val response = app.post(
+            url = "$mainUrl/func/listanime",
+            headers = mapOf(
+                "accept" to "application/json, text/javascript, */*; q=0.01",
+                "content-type" to "application/x-www-form-urlencoded; charset=UTF-8",
+                "x-requested-with" to "XMLHttpRequest",
+                "referer" to request.data
+            ),
+            body = body
+        ).parsed<JsonObject>()
+
+        val results = response["results"]?.asJsonArray
+        val home = if (results != null) {
+            parseAnimeResults(results)
+        } else {
+            emptyList()
+        }
+
+        val totalPage = response["total_page"]?.asInt ?: 1
+        
         return newHomePageResponse(
             list = HomePageList(
                 name = request.name,
                 list = home,
                 isHorizontalImages = false
             ),
+            hasNext = page < totalPage
+        )
+    } catch (e: Exception) {
+        return newHomePageResponse(
+            list = HomePageList(
+                name = request.name,
+                list = emptyList(),
+                isHorizontalImages = false
+            ),
             hasNext = false
         )
     }
+}
 
-    private fun Element.toSearchResult(): SearchResponse? {
-        val titleElement = selectFirst("a") ?: return null
-        val href = titleElement.attr("href")
-        val title = selectFirst(".title_anime")?.text()?.trim() ?: return null
-        val posterUrl = selectFirst("img")?.attr("src")
-        
-        return newAnimeSearchResponse(title, href) {
-            this.posterUrl = fixUrlNull(posterUrl)
+private fun parseAnimeResults(results: JsonArray): List<SearchResponse> {
+    return results.mapNotNull { jsonElement ->
+        try {
+            val htmlString = jsonElement.asString
+            val document = app.newDocument(htmlString)
+            document.select(".itemA").firstOrNull()?.toSearchResult()
+        } catch (e: Exception) {
+            null
         }
     }
+}
+
+
+private fun Element.toSearchResult(): SearchResponse? {
+    val titleElement = selectFirst("a") ?: return null
+    val href = titleElement.attr("href")
+    val title = selectFirst(".title_anime")?.text()?.trim() ?: return null
+    val posterUrl = selectFirst("img")?.attr("src")
+    
+    return newAnimeSearchResponse(title, href) {
+        this.posterUrl = fixUrlNull(posterUrl)
+    }
+}
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query").document
