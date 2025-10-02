@@ -47,40 +47,42 @@ class AnimesDigitalProvider : MainAPI() {
 private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomePageResponse {
     val type = when {
         request.data.contains("animes-dublado") -> "dublado"
-        request.data.contains("animes-legendados") -> "legendado" 
+        request.data.contains("animes-legendados") -> "legendado"
         request.data.contains("filmes") -> "filmes"
         request.data.contains("desenhos") -> "desenhos"
         else -> "animes"
     }
 
-    // Preparar os dados do POST
-    val val filtersJson = "{\"filter_data\":\"filter_letter=0&type_url=$type&filter_audio=$type&filter_order=name\",\"filter_genre_add\":[],\"filter_genre_del\":[]}"
+    // 1. Preparar o JSON de filtros
+    val filtersJson = "{\"filter_data\":\"filter_letter=0&type_url=$type&filter_audio=$type&filter_order=name\",\"filter_genre_add\":[],\"filter_genre_del\":[]}"
 
-// 2. Crie o mapa de dados para o POST
-val postDataMap = mapOf(
-    "token" to "c1deb78cd4",
-    "pagina" to "$page",
-    "search" to "0",
-    "limit" to "30",
-    "type" to "lista",
-    "filters" to filtersJson
-)
+    // 2. Preparar os dados do POST como um MAPA (Necessário para a chamada app.post)
+    val postData = mapOf(
+        "token" to "c1deb78cd4",
+        "pagina" to page.toString(),
+        "search" to "0",
+        "limit" to "30",
+        "type" to "lista",
+        "filters" to filtersJson
+    )
 
-try {
-    val response = app.post(
-        url = "$mainUrl/func/listanime",
-        headers = mapOf(
-            // ... (seus headers)
-        ),
-        data = postDataMap // AGORA É UM MAPA!
-    ) 
+    try {
+        val response = app.post(
+            url = "$mainUrl/func/listanime",
+            headers = mapOf(
+                "accept" to "application/json, text/javascript, */*; q=0.01",
+                "content-type" to "application/x-www-form-urlencoded; charset=UTF-8",
+                "x-requested-with" to "XMLHttpRequest",
+                "referer" to request.data
+            ),
+            data = postData
+        )
 
         val jsonString = response.text
         val home = parseApiResponse(jsonString)
-        
-        // Para simplificar, vamos assumir que tem mais páginas se encontramos resultados
+
         val hasNext = home.isNotEmpty() && home.size >= 30
-        
+
         return newHomePageResponse(
             list = HomePageList(
                 name = request.name,
@@ -90,10 +92,9 @@ try {
             hasNext = hasNext
         )
     } catch (e: Exception) {
-        // Fallback em caso de erro - tentar método tradicional
         return getFallbackPage(request)
     }
-}
+} 
 
 private fun parseApiResponse(jsonString: String): List<SearchResponse> {
     val results = mutableListOf<SearchResponse>()
