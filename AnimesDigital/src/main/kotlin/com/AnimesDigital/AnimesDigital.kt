@@ -13,8 +13,8 @@ class AnimesDigitalProvider : MainAPI() {
     override val hasDownloadSupport = true
 
     override val mainPage = mainPageOf(
-        "$mainUrl/lancamentos" to "Últimos Episódios",
         "$mainUrl/animes-legendados-online" to "Animes Legendados", 
+        "$mainUrl/lancamentos" to "Últimos Episódios",
         "$mainUrl/animes-dublado" to "Animes Dublados",
         "$mainUrl/filmes" to "Filmes",
         "$mainUrl/desenhos-online" to "Desenhos"
@@ -22,7 +22,7 @@ class AnimesDigitalProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(request.data).document
-        val home = document.select("div.itemE, div#animePost .itemA").mapNotNull {
+        val home = document.select("div.itemA").mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(
