@@ -20,7 +20,7 @@ class AnimesDigitalProvider : MainAPI() {
         "$mainUrl/desenhos-online" to "Desenhos"
     )
 
-   override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+  override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
     return when {
         request.data.contains("lancamentos") -> {
             // Página de lançamentos (funciona com o código atual)
@@ -53,15 +53,13 @@ private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomeP
         else -> "animes"
     }
 
-    // Preparar os parâmetros do POST
-    val formData = listOf(
-        "token" to "c1deb78cd4",
-        "pagina" to page.toString(),
-        "search" to "0",
-        "limit" to "30",
-        "type" to "lista",
-        "filters" to """{"filter_data":"filter_letter=0&type_url=$type&filter_audio=$type&filter_order=name","filter_genre_add":[],"filter_genre_del":[]}"""
-    )
+    // Preparar os dados do POST
+    val postData = "token=c1deb78cd4" +
+        "&pagina=${page}" +
+        "&search=0" +
+        "&limit=30" +
+        "&type=lista" +
+        "&filters={\"filter_data\":\"filter_letter=0&type_url=$type&filter_audio=$type&filter_order=name\",\"filter_genre_add\":[],\"filter_genre_del\":[]}"
 
     try {
         val response = app.post(
@@ -72,10 +70,9 @@ private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomeP
                 "x-requested-with" to "XMLHttpRequest",
                 "referer" to request.data
             ),
-            body = formData
+            data = postData // Usar 'data' em vez de 'body'
         )
 
-        // Parse da resposta JSON manualmente
         val jsonString = response.text
         val home = parseApiResponse(jsonString)
         
@@ -100,7 +97,7 @@ private fun parseApiResponse(jsonString: String): List<SearchResponse> {
     val results = mutableListOf<SearchResponse>()
     
     try {
-        // Extrair o array de resultados usando regex (mais simples que parser JSON completo)
+        // Extrair o array de resultados usando regex
         val resultsMatch = Regex(""""results":\\s*\\[(.*?)\\]",?""").find(jsonString)
         if (resultsMatch != null) {
             val resultsContent = resultsMatch.groupValues[1]
@@ -112,7 +109,8 @@ private fun parseApiResponse(jsonString: String): List<SearchResponse> {
                 try {
                     // Limpar as barras de escape
                     val cleanHtml = match.value.replace("\\", "")
-                    val document = app.newDocument(cleanHtml)
+                    // Usar Jsoup diretamente para parse do HTML
+                    val document = org.jsoup.Jsoup.parse(cleanHtml)
                     val searchResult = document.select(".itemA").firstOrNull()?.toSearchResult()
                     if (searchResult != null) {
                         results.add(searchResult)
