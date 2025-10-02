@@ -269,51 +269,44 @@ private fun String?.toStatus(): Int? {
     val infoContainer = document.selectFirst(".single_anime, .single-content") ?: document
 
     // 1. EXTRAÇÃO DE METADADOS
-    
-    // Título
     val title = infoContainer.selectFirst("h1.single-title, h1")?.text()?.trim() 
         ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.substringBefore(" - Animes Online")?.trim()
         ?: document.selectFirst("h1, h2")?.text() ?: return null
 
-    // Poster
     val poster = infoContainer.selectFirst(".foto img")?.attr("src") 
         ?: document.selectFirst("img[src*=/uploads/]")?.attr("src") 
         ?: document.selectFirst("meta[property=og:image]")?.attr("content")
     val posterUrl = fixUrlNull(poster)
     
-    // Sinopse
     val description = infoContainer.selectFirst(".sinopse p")?.text()?.trim() 
         ?: document.selectFirst("meta[property=og:description]")?.attr("content")
 
-    // Tags
     val tags = infoContainer.select(".generos a, .single-meta a[href*='genero']").map { it.text().trim() }
     
-    // Status
     val statusText = infoContainer.selectFirst(".status span")?.text()?.trim()
     val status = statusText.toStatus()
 
-    // Determinar o TvType (Filme ou Anime)
     val tvType = if (url.contains("/filmes/", ignoreCase = true)) TvType.Movie else TvType.Anime
     
-    // Determinar o DubStatus padrão da página
     val defaultDubStatus = when {
         url.contains("dublado", ignoreCase = true) || url.contains("desenhos", ignoreCase = true) -> DubStatus.Dubbed
         else -> DubStatus.Subbed
     }
 
-    // 2. EXTRAÇÃO DE EPISÓDIOS (CORREÇÃO FINAL)
+    // 2. EXTRAÇÃO DE EPISÓDIOS (CORRIGIDO)
     
-    // Seletor correto para a lista de episódios
+    // Seletor corrigido para a lista de episódios
     val episodes = document.select("#lista_de_episodios a") 
         .mapNotNull { epElement ->
             val epUrl = epElement.attr("href")
             val epTitle = epElement.text().trim()
             
             if (epUrl.isNotEmpty() && epTitle.isNotEmpty()) {
-                // Extrai o número do episódio
+                // Extrai o número do episódio e garante que é INT (para evitar o erro de compilação anterior)
                 val epNumMatch = Regex("Episódio\\s+(\\d+)|Cap\\.\\s+(\\d+)|(\\d+)").find(epTitle)
-                val episodeNumber = epNumMatch?.groupValues?.lastOrNull()?.toFloatOrNull() ?: 0f
+                val episodeNumber = epNumMatch?.groupValues?.lastOrNull()?.toIntOrNull() ?: 0 
                 
+                // Formato URL ESSENCIAL para o Player 2
                 val urlWithIndex = "$epUrl|#|$episodeNumber" 
                 
                 newEpisode(urlWithIndex) {
@@ -326,7 +319,6 @@ private fun String?.toStatus(): Int? {
         .reversed() // Inverte para ter a ordem 1, 2, 3...
 
     // 3. SEPARAÇÃO E RETORNO FINAL
-    
     val dubEpisodes = episodes.filter { it.dubStatus == DubStatus.Dubbed }
     val subEpisodes = episodes.filter { it.dubStatus == DubStatus.Subbed }
 
@@ -334,12 +326,10 @@ private fun String?.toStatus(): Int? {
         this.posterUrl = posterUrl
         this.plot = description
         this.tags = tags
-        this.status = status
+        this.status = status 
         
-        // Adiciona os episódios na aba correta (Dublado/Legendado)
         if (dubEpisodes.isNotEmpty()) addEpisodes(DubStatus.Dubbed, dubEpisodes)
         if (subEpisodes.isNotEmpty()) addEpisodes(DubStatus.Subbed, subEpisodes)
-
     }
 }
 
