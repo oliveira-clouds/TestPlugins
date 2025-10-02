@@ -22,7 +22,7 @@ class AnimesDigitalProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(request.data).document
-        val home = document.select("div.itemA").mapNotNull {
+        val home = document.select(".itemE, .itemA").mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(
