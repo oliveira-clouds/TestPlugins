@@ -54,24 +54,26 @@ private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomeP
     }
 
     // Preparar os dados do POST
-    val postData = "token=c1deb78cd4" +
-        "&pagina=${page}" +
-        "&search=0" +
-        "&limit=30" +
-        "&type=lista" +
-        "&filters={\"filter_data\":\"filter_letter=0&type_url=$type&filter_audio=$type&filter_order=name\",\"filter_genre_add\":[],\"filter_genre_del\":[]}"
+    val val filtersJson = "{\"filter_data\":\"filter_letter=0&type_url=$type&filter_audio=$type&filter_order=name\",\"filter_genre_add\":[],\"filter_genre_del\":[]}"
 
-    try {
-        val response = app.post(
-            url = "$mainUrl/func/listanime",
-            headers = mapOf(
-                "accept" to "application/json, text/javascript, */*; q=0.01",
-                "content-type" to "application/x-www-form-urlencoded; charset=UTF-8",
-                "x-requested-with" to "XMLHttpRequest",
-                "referer" to request.data
-            ),
-            data = postData // Usar 'data' em vez de 'body'
-        )
+// 2. Crie o mapa de dados para o POST
+val postDataMap = mapOf(
+    "token" to "c1deb78cd4",
+    "pagina" to "$page",
+    "search" to "0",
+    "limit" to "30",
+    "type" to "lista",
+    "filters" to filtersJson
+)
+
+try {
+    val response = app.post(
+        url = "$mainUrl/func/listanime",
+        headers = mapOf(
+            // ... (seus headers)
+        ),
+        data = postDataMap // AGORA É UM MAPA!
+    ) 
 
         val jsonString = response.text
         val home = parseApiResponse(jsonString)
