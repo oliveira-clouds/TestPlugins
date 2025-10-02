@@ -20,7 +20,7 @@ class AnimesDigitalProvider : MainAPI() {
         "$mainUrl/desenhos-online" to "Desenhos"
     )
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+   override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
     return when {
         request.data.contains("lancamentos") -> {
             // Página de lançamentos (funciona com o código atual)
@@ -53,8 +53,8 @@ private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomeP
         else -> "animes"
     }
 
-    // Parâmetros baseados na requisição que você encontrou
-    val body = mapOf(
+    // Preparar os parâmetros do POST
+    val formData = listOf(
         "token" to "c1deb78cd4",
         "pagina" to page.toString(),
         "search" to "0",
@@ -72,17 +72,15 @@ private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomeP
                 "x-requested-with" to "XMLHttpRequest",
                 "referer" to request.data
             ),
-            body = body
-        ).parsed<JsonObject>()
+            body = formData
+        )
 
-        val results = response["results"]?.asJsonArray
-        val home = if (results != null) {
-            parseAnimeResults(results)
-        } else {
-            emptyList()
-        }
-
-        val totalPage = response["total_page"]?.asInt ?: 1
+        // Parse da resposta JSON manualmente
+        val jsonString = response.text
+        val home = parseApiResponse(jsonString)
+        
+        // Para simplificar, vamos assumir que tem mais páginas se encontramos resultados
+        val hasNext = home.isNotEmpty() && home.size >= 30
         
         return newHomePageResponse(
             list = HomePageList(
@@ -90,32 +88,82 @@ private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomeP
                 list = home,
                 isHorizontalImages = false
             ),
-            hasNext = page < totalPage
+            hasNext = hasNext
         )
     } catch (e: Exception) {
-        return newHomePageResponse(
-            list = HomePageList(
-                name = request.name,
-                list = emptyList(),
-                isHorizontalImages = false
-            ),
-            hasNext = false
-        )
+        // Fallback em caso de erro - tentar método tradicional
+        return getFallbackPage(request)
     }
 }
 
-private fun parseAnimeResults(results: JsonArray): List<SearchResponse> {
-    return results.mapNotNull { jsonElement ->
-        try {
-            val htmlString = jsonElement.asString
-            val document = app.newDocument(htmlString)
-            document.select(".itemA").firstOrNull()?.toSearchResult()
-        } catch (e: Exception) {
-            null
+private fun parseApiResponse(jsonString: String): List<SearchResponse> {
+    val results = mutableListOf<SearchResponse>()
+    
+    try {
+        // Extrair o array de resultados usando regex (mais simples que parser JSON completo)
+        val resultsMatch = Regex(""""results":\\s*\\[(.*?)\\]",?""").find(jsonString)
+        if (resultsMatch != null) {
+            val resultsContent = resultsMatch.groupValues[1]
+            
+            // Encontrar cada item HTML dentro do array
+            val itemMatches = Regex("""<div class=\\"itemA\\".*?<\\/div>\\s*<\\/div>""").findAll(resultsContent)
+            
+            itemMatches.forEach { match ->
+                try {
+                    // Limpar as barras de escape
+                    val cleanHtml = match.value.replace("\\", "")
+                    val document = app.newDocument(cleanHtml)
+                    val searchResult = document.select(".itemA").firstOrNull()?.toSearchResult()
+                    if (searchResult != null) {
+                        results.add(searchResult)
+                    }
+                } catch (e: Exception) {
+                    // Ignorar item com erro
+                }
+            }
         }
+    } catch (e: Exception) {
+        // Se falhar o parsing, retornar lista vazia
     }
+    
+    return results
 }
 
+// Método fallback caso a API não funcione
+private suspend fun getFallbackPage(request: MainPageRequest): HomePageResponse {
+    val document = app.get(request.data).document
+    
+    // Tentar diferentes seletores possíveis
+    val home = document.select(".itemA, .anime-item, .item, .post, [class*='anime']").mapNotNull {
+        it.toSearchResultAlternative()
+    }
+    
+    return newHomePageResponse(
+        list = HomePageList(
+            name = request.name,
+            list = home,
+            isHorizontalImages = false
+        ),
+        hasNext = false
+    )
+}
+
+// Método alternativo para extrair dados de elementos diferentes
+private fun Element.toSearchResultAlternative(): SearchResponse? {
+    // Tentar diferentes seletores possíveis
+    val titleElement = selectFirst("a") ?: selectFirst(".title, .name, h1, h2, h3") ?: return null
+    val href = titleElement.attr("href")
+    val title = titleElement.text().trim()
+    val posterUrl = selectFirst("img")?.attr("src") ?: selectFirst("img")?.attr("data-src")
+    
+    return if (title.isNotEmpty() && href.isNotEmpty()) {
+        newAnimeSearchResponse(title, href) {
+            this.posterUrl = fixUrlNull(posterUrl)
+        }
+    } else {
+        null
+    }
+}
 
 private fun Element.toSearchResult(): SearchResponse? {
     val titleElement = selectFirst("a") ?: return null
