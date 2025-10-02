@@ -267,8 +267,12 @@ class AnimesDigitalProvider : MainAPI() {
 
         // EXTRAÇÃO DE METADADOS
         val title = infoContainer.selectFirst("h1.single-title, h1")?.text()?.trim() 
-            ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.let { 
-                it.substringBefore(" - Animes Online").trim() 
+            ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.let { content ->
+                if (content.contains(" - Animes Online")) {
+                    content.substringBefore(" - Animes Online").trim()
+                } else {
+                    content
+                }
             }
             ?: document.selectFirst("h1, h2")?.text() ?: return null
 
@@ -312,18 +316,17 @@ class AnimesDigitalProvider : MainAPI() {
             }
             .reversed()
 
-        val dubEpisodes = episodes.filter { 
-            it.name.contains("dublado", ignoreCase = true) || defaultDubStatus == DubStatus.Dubbed 
+        val dubEpisodes = episodes.filter { episode ->
+            episode.name.contains("dublado", ignoreCase = true) || defaultDubStatus == DubStatus.Dubbed 
         }
-        val subEpisodes = episodes.filter { 
-            !it.name.contains("dublado", ignoreCase = true) || defaultDubStatus == DubStatus.Subbed 
+        val subEpisodes = episodes.filter { episode ->
+            !episode.name.contains("dublado", ignoreCase = true) || defaultDubStatus == DubStatus.Subbed 
         }
 
         return newAnimeLoadResponse(title, url, tvType) {
             this.posterUrl = posterUrl
             this.plot = description
             this.tags = tags
-            // Removido status pois não é uma propriedade válida
 
             if (dubEpisodes.isNotEmpty()) addEpisodes(DubStatus.Dubbed, dubEpisodes)
             if (subEpisodes.isNotEmpty()) addEpisodes(DubStatus.Subbed, subEpisodes)
