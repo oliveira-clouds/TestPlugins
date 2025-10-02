@@ -230,10 +230,11 @@ private fun Element.toSearchResult(): SearchResponse? {
 }
 
 
+
 private fun String?.toStatus(): Int? {
     return when (this?.lowercase()) {
-        "completo" -> TvSeries.TvSeriesStatus.Completed.ordinal
-        "em lançamento" -> TvSeries.TvSeriesStatus.Ongoing.ordinal
+        "completo" -> com.lagradost.cloudstream3.TvSeries.TvSeriesStatus.Completed.ordinal
+        "em lançamento" -> com.lagradost.cloudstream3.TvSeries.TvSeriesStatus.Ongoing.ordinal
         else -> null
     }
 }
@@ -264,11 +265,10 @@ private fun String?.toStatus(): Int? {
         }
     }
 
-   private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
-    // Container principal de informações
+   private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): com.lagradost.cloudstream3.LoadResponse? {
     val infoContainer = document.selectFirst(".single_anime, .single-content") ?: document
 
-    // 1. EXTRAÇÃO DE METADADOS
+    // EXTRAÇÃO DE METADADOS
     val title = infoContainer.selectFirst("h1.single-title, h1")?.text()?.trim() 
         ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.substringBefore(" - Animes Online")?.trim()
         ?: document.selectFirst("h1, h2")?.text() ?: return null
@@ -286,41 +286,39 @@ private fun String?.toStatus(): Int? {
     val statusText = infoContainer.selectFirst(".status span")?.text()?.trim()
     val status = statusText.toStatus()
 
-    val tvType = if (url.contains("/filmes/", ignoreCase = true)) TvType.Movie else TvType.Anime
+    // CORREÇÃO: Usando o nome completo para TvType
+    val tvType = if (url.contains("/filmes/", ignoreCase = true)) com.lagradost.cloudstream3.TvType.Movie else com.lagradost.cloudstream3.TvType.Anime
     
+    // CORREÇÃO: Usando o nome completo para DubStatus
     val defaultDubStatus = when {
-        url.contains("dublado", ignoreCase = true) || url.contains("desenhos", ignoreCase = true) -> DubStatus.Dubbed
-        else -> DubStatus.Subbed
+        url.contains("dublado", ignoreCase = true) || url.contains("desenhos", ignoreCase = true) -> com.lagradost.cloudstream3.DubStatus.Dubbed
+        else -> com.lagradost.cloudstream3.DubStatus.Subbed
     }
 
-    // 2. EXTRAÇÃO DE EPISÓDIOS (CORRIGIDO)
-    
-    // Seletor corrigido para a lista de episódios
+    // EXTRAÇÃO DE EPISÓDIOS
     val episodes = document.select("#lista_de_episodios a") 
         .mapNotNull { epElement ->
             val epUrl = epElement.attr("href")
             val epTitle = epElement.text().trim()
             
             if (epUrl.isNotEmpty() && epTitle.isNotEmpty()) {
-                // Extrai o número do episódio e garante que é INT (para evitar o erro de compilação anterior)
                 val epNumMatch = Regex("Episódio\\s+(\\d+)|Cap\\.\\s+(\\d+)|(\\d+)").find(epTitle)
                 val episodeNumber = epNumMatch?.groupValues?.lastOrNull()?.toIntOrNull() ?: 0 
                 
-                // Formato URL ESSENCIAL para o Player 2
                 val urlWithIndex = "$epUrl|#|$episodeNumber" 
                 
                 newEpisode(urlWithIndex) {
                     this.name = epTitle
                     this.episode = episodeNumber
+                    // CORREÇÃO: 'dubStatus' e 'DubStatus'
                     this.dubStatus = defaultDubStatus
                 }
             } else null
         }
-        .reversed() // Inverte para ter a ordem 1, 2, 3...
+        .reversed()
 
-    // 3. SEPARAÇÃO E RETORNO FINAL
-    val dubEpisodes = episodes.filter { it.dubStatus == DubStatus.Dubbed }
-    val subEpisodes = episodes.filter { it.dubStatus == DubStatus.Subbed }
+    val dubEpisodes = episodes.filter { it.dubStatus == com.lagradost.cloudstream3.DubStatus.Dubbed }
+    val subEpisodes = episodes.filter { it.dubStatus == com.lagradost.cloudstream3.DubStatus.Subbed }
 
     return newAnimeLoadResponse(title, url, tvType) {
         this.posterUrl = posterUrl
@@ -328,8 +326,9 @@ private fun String?.toStatus(): Int? {
         this.tags = tags
         this.status = status 
         
-        if (dubEpisodes.isNotEmpty()) addEpisodes(DubStatus.Dubbed, dubEpisodes)
-        if (subEpisodes.isNotEmpty()) addEpisodes(DubStatus.Subbed, subEpisodes)
+
+        if (dubEpisodes.isNotEmpty()) addEpisodes(com.lagradost.cloudstream3.DubStatus.Dubbed, dubEpisodes)
+        if (subEpisodes.isNotEmpty()) addEpisodes(com.lagradost.cloudstream3.DubStatus.Subbed, subEpisodes)
     }
 }
 
