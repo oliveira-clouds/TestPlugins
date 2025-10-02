@@ -20,10 +20,10 @@ class AnimesDigitalProvider : MainAPI() {
         "$mainUrl/desenhos-online" to "Desenhos"
     )
 
-  override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+ override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
     return when {
         request.data.contains("lancamentos") -> {
-            // Página de lançamentos (funciona com o código atual)
+            // Página de lançamentos - scraping tradicional
             val document = app.get(request.data).document
             val home = document.select(".itemE, .itemA").mapNotNull {
                 it.toSearchResult()
@@ -38,25 +38,43 @@ class AnimesDigitalProvider : MainAPI() {
             )
         }
         else -> {
-            // Para outras categorias, usar a API
+            // Todas as outras categorias - usar API
             getAnimesFromAPI(page, request)
         }
     }
 }
 
 private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomePageResponse {
-    val type = when {
-        request.data.contains("animes-dublado") -> "dublado"
-        request.data.contains("animes-legendados") -> "legendado"
-        request.data.contains("filmes") -> "filmes"
-        request.data.contains("desenhos") -> "desenhos"
-        else -> "animes"
+    val (typeUrl, filterAudio) = when {
+        request.data.contains("animes-dublado") -> "animes" to "dublado"
+        request.data.contains("animes-legendados") -> "animes" to "legendado"
+        request.data.contains("filmes") -> "filmes" to "0"
+        request.data.contains("desenhos") -> "desenhos" to "0"
+        else -> "animes" to "animes"
     }
 
-    // 1. Preparar o JSON de filtros
-    val filtersJson = "{\"filter_data\":\"filter_letter=0&type_url=$type&filter_audio=$type&filter_order=name\",\"filter_genre_add\":[],\"filter_genre_del\":[]}"
+    // Construir referrer exato como o navegador
+    val referrerParams = mapOf(
+        "filter_letter" to "0",
+        "type_url" to typeUrl,
+        "filter_audio" to filterAudio,
+        "filter_order" to "name",
+        "filter_genre_add" to "",
+        "filter_genre_del" to "",
+        "pagina" to page.toString(),
+        "search" to "0",
+        "limit" to "30"
+    )
+    
+    val referrerQuery = referrerParams.map { (k, v) -> "$k=$v" }.joinToString("&")
+    val referrerUrl = if (request.data.contains("?")) {
+        "${request.data}&$referrerQuery"
+    } else {
+        "${request.data}?$referrerQuery"
+    }
 
-    // 2. Preparar os dados do POST como um MAPA (Necessário para a chamada app.post)
+    val filtersJson = """{"filter_data":"filter_letter=0&type_url=$typeUrl&filter_audio=$filterAudio&filter_order=name","filter_genre_add":[],"filter_genre_del":[]}"""
+
     val postData = mapOf(
         "token" to "c1deb78cd4",
         "pagina" to page.toString(),
@@ -73,15 +91,16 @@ private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomeP
                 "accept" to "application/json, text/javascript, */*; q=0.01",
                 "content-type" to "application/x-www-form-urlencoded; charset=UTF-8",
                 "x-requested-with" to "XMLHttpRequest",
-                "referer" to request.data
+                "referer" to referrerUrl
             ),
             data = postData
         )
 
         val jsonString = response.text
         val home = parseApiResponse(jsonString)
-
-        val hasNext = home.isNotEmpty() && home.size >= 30
+        
+        val totalPage = extractTotalPage(jsonString)
+        val hasNext = page < totalPage
 
         return newHomePageResponse(
             list = HomePageList(
@@ -92,28 +111,28 @@ private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomeP
             hasNext = hasNext
         )
     } catch (e: Exception) {
+        e.printStackTrace()
+        // Fallback para scraping se a API falhar
         return getFallbackPage(request)
     }
-} 
+}
 
 private fun parseApiResponse(jsonString: String): List<SearchResponse> {
     val results = mutableListOf<SearchResponse>()
     
     try {
-        // Extrair o array de resultados usando regex
-        val resultsMatch = Regex(""""results":\\s*\\[(.*?)\\]",?""").find(jsonString)
+        // Extrair o array de resultados
+        val resultsMatch = Regex(""""results"\s*:\s*\\[([^\\]]+)\\]""").find(jsonString)
         if (resultsMatch != null) {
             val resultsContent = resultsMatch.groupValues[1]
             
-            // Encontrar cada item HTML dentro do array
+            // Encontrar cada item HTML
             val itemMatches = Regex("""<div class=\\"itemA\\".*?<\\/div>\\s*<\\/div>""").findAll(resultsContent)
             
             itemMatches.forEach { match ->
                 try {
-                    // Limpar as barras de escape
                     val cleanHtml = match.value.replace("\\", "")
-                    // Usar Jsoup diretamente para parse do HTML
-                    val document = org.jsoup.Jsoup.parse(cleanHtml)
+                    val document = org.jsoup.Jsoup.parseBodyFragment(cleanHtml)
                     val searchResult = document.select(".itemA").firstOrNull()?.toSearchResult()
                     if (searchResult != null) {
                         results.add(searchResult)
@@ -124,10 +143,19 @@ private fun parseApiResponse(jsonString: String): List<SearchResponse> {
             }
         }
     } catch (e: Exception) {
-        // Se falhar o parsing, retornar lista vazia
+        e.printStackTrace()
     }
     
     return results
+}
+
+private fun extractTotalPage(jsonString: String): Int {
+    return try {
+        val totalPageMatch = Regex(""","total_page"\s*:\s*(\\d+)""").find(jsonString)
+        totalPageMatch?.groupValues?.get(1)?.toInt() ?: 1
+    } catch (e: Exception) {
+        1
+    }
 }
 
 // Método fallback caso a API não funcione
@@ -151,7 +179,6 @@ private suspend fun getFallbackPage(request: MainPageRequest): HomePageResponse 
 
 // Método alternativo para extrair dados de elementos diferentes
 private fun Element.toSearchResultAlternative(): SearchResponse? {
-    // Tentar diferentes seletores possíveis
     val titleElement = selectFirst("a") ?: selectFirst(".title, .name, h1, h2, h3") ?: return null
     val href = titleElement.attr("href")
     val title = titleElement.text().trim()
@@ -166,6 +193,7 @@ private fun Element.toSearchResultAlternative(): SearchResponse? {
     }
 }
 
+// Seu método original
 private fun Element.toSearchResult(): SearchResponse? {
     val titleElement = selectFirst("a") ?: return null
     val href = titleElement.attr("href")
