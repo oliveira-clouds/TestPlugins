@@ -3,6 +3,7 @@ package com.AnimesDigital
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
+import org.json.JSONObject
 
 class AnimesDigitalProvider : MainAPI() {
     override var mainUrl = "https://animesdigital.org"
@@ -121,28 +122,29 @@ private fun parseApiResponse(jsonString: String): List<SearchResponse> {
     val results = mutableListOf<SearchResponse>()
     
     try {
-        // Extrair o array de resultados
-        val resultsMatch = Regex(""""results"\s*:\s*\\[([^\\]]+)\\]""").find(jsonString)
-        if (resultsMatch != null) {
-            val resultsContent = resultsMatch.groupValues[1]
+        val jsonObject = JSONObject(jsonString)
+        val resultsArray = jsonObject.optJSONArray("results") ?: return emptyList()
+
+        for (i in 0 until resultsArray.length()) {
+            val escapedHtml = resultsArray.optString(i) ?: continue
+
+            // 1. Limpar as barras de escape. 
+            // O JSON escapa aspas internas, precisamos revertê-las para que o Jsoup as veja corretamente.
+            val cleanHtml = escapedHtml.replace("\\\"", "\"").replace("\\/", "/") 
             
-            // Encontrar cada item HTML
-            val itemMatches = Regex("""<div class=\\"itemA\\".*?<\\/div>\\s*<\\/div>""").findAll(resultsContent)
+            // 2. Usar Jsoup para parsear o fragmento HTML limpo
+            // O parseBodyFragment é ideal para pequenos pedaços de HTML.
+            val document = org.jsoup.Jsoup.parseBodyFragment(cleanHtml)
             
-            itemMatches.forEach { match ->
-                try {
-                    val cleanHtml = match.value.replace("\\", "")
-                    val document = org.jsoup.Jsoup.parseBodyFragment(cleanHtml)
-                    val searchResult = document.select(".itemA").firstOrNull()?.toSearchResult()
-                    if (searchResult != null) {
-                        results.add(searchResult)
-                    }
-                } catch (e: Exception) {
-                    // Ignorar item com erro
-                }
+            // 3. Selecionar o item e usar a função toSearchResult existente
+            val searchResult = document.selectFirst(".itemA")?.toSearchResult()
+            
+            if (searchResult != null) {
+                results.add(searchResult)
             }
         }
     } catch (e: Exception) {
+        // Imprimir erro se o JSON for inválido
         e.printStackTrace()
     }
     
@@ -151,8 +153,9 @@ private fun parseApiResponse(jsonString: String): List<SearchResponse> {
 
 private fun extractTotalPage(jsonString: String): Int {
     return try {
-        val totalPageMatch = Regex(""","total_page"\s*:\s*(\\d+)""").find(jsonString)
-        totalPageMatch?.groupValues?.get(1)?.toInt() ?: 1
+        val jsonObject = JSONObject(jsonString)
+        // O optInt retorna 1 se a chave não for encontrada ou se o valor for inválido
+        jsonObject.optInt("total_page", 1) 
     } catch (e: Exception) {
         1
     }
