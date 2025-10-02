@@ -2,9 +2,11 @@ package com.AnimesDigital
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.DubStatus
 import com.lagradost.cloudstream3.TvSeries.TvSeriesStatus
 import org.jsoup.nodes.Element
 import org.json.JSONObject
+import java.util.Base64
 
 class AnimesDigitalProvider : MainAPI() {
     override var mainUrl = "https://animesdigital.org"
@@ -414,8 +416,8 @@ override suspend fun loadLinks(
     private fun decodeAnimesDigitalUrl(iframeSrc: String): String? {
         // Tenta usar o Base64 do Android (como você estava usando)
         return try {
-            val base64Part = iframeSrc.substringAfter("animesdigital.org/").substringBefore("/")
-            val decoded = android.util.Base64.decode(base64Part, android.util.Base64.DEFAULT)
+           val base64Part = iframeSrc.substringAfter("animesdigital.org/").substringBefore("/")
+            val decoded = Base64.getDecoder().decode(base64Part) 
             String(decoded)
         } catch (e: Exception) {
             null
