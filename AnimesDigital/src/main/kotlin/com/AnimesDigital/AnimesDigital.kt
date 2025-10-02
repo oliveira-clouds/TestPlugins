@@ -317,10 +317,10 @@ class AnimesDigitalProvider : MainAPI() {
             .reversed()
 
         val dubEpisodes = episodes.filter { episode ->
-            episode.name.contains("dublado", ignoreCase = true) || defaultDubStatus == DubStatus.Dubbed 
+            episode.name?.contains("dublado", ignoreCase = true) == true || defaultDubStatus == DubStatus.Dubbed 
         }
         val subEpisodes = episodes.filter { episode ->
-            !episode.name.contains("dublado", ignoreCase = true) || defaultDubStatus == DubStatus.Subbed 
+            episode.name?.contains("dublado", ignoreCase = true) != true || defaultDubStatus == DubStatus.Subbed 
         }
 
         return newAnimeLoadResponse(title, url, tvType) {
