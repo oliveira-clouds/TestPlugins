@@ -307,11 +307,23 @@ class AnimesDigitalProvider : MainAPI() {
     allEpisodes.addAll(sidebarEpisodes)
     allEpisodes.add(currentEpisode)
     
+     // EXTRAI O LINK DA PÁGINA PRINCIPAL DO ANIME
+    val animeUrl = document.selectFirst(".epsL a[href]")?.attr("href") 
+        ?: document.selectFirst("a[href*='/anime/a/']")?.attr("href")
+
 
     return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
         this.posterUrl = poster
         this.plot = description
         addEpisodes(DubStatus.Subbed, allEpisodes)
+
+         if (animeUrl != null) {
+            this.recommendations = listOf(
+                newAnimeSearchResponse("Ver todos os episódios", fixUrl(animeUrl), TvType.Anime) {
+                    this.posterUrl = poster
+                }
+            )
+        }
     }
 }
 
