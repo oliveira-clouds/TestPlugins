@@ -372,77 +372,128 @@ private fun extractCurrentEpisodeNumber(url: String, title: String): Int {
 }
 
     private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
-        val infoContainer = document.selectFirst(".single_anime, .single-content") ?: document
+    val infoContainer = document.selectFirst(".single_anime, .single-content") ?: document
 
-        val title = infoContainer.selectFirst("h1.single-title, h1")?.text()?.trim() 
-            ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.let { content ->
-                if (content.contains(" - Animes Online")) {
-                    content.substringBefore(" - Animes Online").trim()
-                } else {
-                    content
-                }
+    val title = infoContainer.selectFirst("h1.single-title, h1")?.text()?.trim() 
+        ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.let { content ->
+            if (content.contains(" - Animes Online")) {
+                content.substringBefore(" - Animes Online").trim()
+            } else {
+                content
             }
-            ?: document.selectFirst("h1, h2")?.text() ?: return null
-
-        val poster = infoContainer.selectFirst(".foto img")?.attr("src") 
-            ?: document.selectFirst("img[src*=/uploads/]")?.attr("src") 
-            ?: document.selectFirst("meta[property=og:image]")?.attr("content")
-        val posterUrl = fixUrlNull(poster)
-        
-        val description = infoContainer.selectFirst(".sinopse p")?.text()?.trim() 
-            ?: document.selectFirst("meta[property=og:description]")?.attr("content")
-
-        val tags = infoContainer.select(".generos a, .single-meta a[href*='genero']").map { it.text().trim() }
-        
-        val statusText = infoContainer.selectFirst(".status span")?.text()?.trim()
-        val status = statusText.toStatus()
-
-        val tvType = if (url.contains("/filme/", ignoreCase = true)) TvType.Movie else TvType.Anime
-        
-        val defaultDubStatus = when {
-            url.contains("dublado", ignoreCase = true) || url.contains("desenhos", ignoreCase = true) -> DubStatus.Dubbed
-            else -> DubStatus.Subbed
         }
-         if (tvType == TvType.Movie) {
+        ?: document.selectFirst("h1, h2")?.text() ?: return null
+
+    val poster = infoContainer.selectFirst(".foto img")?.attr("src") 
+        ?: document.selectFirst("img[src*=/uploads/]")?.attr("src") 
+        ?: document.selectFirst("meta[property=og:image]")?.attr("content")
+    val posterUrl = fixUrlNull(poster)
+    
+    val description = infoContainer.selectFirst(".sinopse p")?.text()?.trim() 
+        ?: document.selectFirst("meta[property=og:description]")?.attr("content")
+
+    val tags = infoContainer.select(".generos a, .single-meta a[href*='genero']").map { it.text().trim() }
+    
+    val statusText = infoContainer.selectFirst(".status span")?.text()?.trim()
+    val status = statusText.toStatus()
+
+    val tvType = if (url.contains("/filme/", ignoreCase = true)) TvType.Movie else TvType.Anime
+    
+    val defaultDubStatus = when {
+        url.contains("dublado", ignoreCase = true) || url.contains("desenhos", ignoreCase = true) -> DubStatus.Dubbed
+        else -> DubStatus.Subbed
+    }
+    
+    if (tvType == TvType.Movie) {
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
             this.posterUrl = posterUrl
             this.plot = description
             this.tags = tags
         }
     }
-        val episodeLinks = document.select(".item_ep a")
 
-        val episodes = episodeLinks.mapNotNull { epElement ->
-            val epUrl = epElement.attr("href").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+    // CARREGA TODOS OS EPISÓDIOS (TODAS AS PÁGINAS)
+    val allEpisodes = loadAllEpisodes(url, document)
+
+    return newAnimeLoadResponse(title, url, tvType) {
+        this.posterUrl = posterUrl
+        this.plot = description
+        this.tags = tags
+
+        if (allEpisodes.isNotEmpty()) addEpisodes(defaultDubStatus, allEpisodes)
+    }
+}
+
+// Função para carregar todos os episódios de todas as páginas
+private suspend fun loadAllEpisodes(initialUrl: String, initialDocument: org.jsoup.nodes.Document): List<Episode> {
+    val allEpisodes = mutableListOf<Episode>()
+    
+    // Carrega primeira página
+    allEpisodes.addAll(extractEpisodesFromPage(initialDocument))
+    
+    var currentPage = 1
+    var hasMorePages = true
+    
+    while (hasMorePages && currentPage < 50) { // Limite de segurança
+        currentPage++
+        
+        val nextPageUrl = if (initialUrl.contains("/page/")) {
+            initialUrl.replace(Regex("/page/\\d+/"), "/page/$currentPage/")
+        } else {
+            "${initialUrl.removeSuffix("/")}/page/$currentPage/"
+        }
+        
+        try {
+            val nextDocument = app.get(nextPageUrl).document
+            val nextEpisodes = extractEpisodesFromPage(nextDocument)
             
-            val titleElement = epElement.selectFirst("div.title_anime")
-            var epTitle = titleElement?.text()?.trim()
-            
-            if (epTitle.isNullOrEmpty()) {
-                val imgTag = epElement.selectFirst("img")
-                epTitle = imgTag?.attr("title")?.replace("Assistir ", "") ?: "Título Desconhecido"
+            // Se não encontrou episódios ou se a página redirecionou para a primeira
+            if (nextEpisodes.isEmpty() || isFirstPageRedirect(nextDocument, initialUrl)) {
+                hasMorePages = false
+            } else {
+                allEpisodes.addAll(nextEpisodes)
             }
             
-            epTitle = epTitle?.replace("Episodio ", "Episódio ") ?: "Episódio"
-            
-            val episodeNumber = extractEpisodeNumber(epTitle, epUrl)
-            
-            val urlWithIndex = "$epUrl|#|$episodeNumber"
-
-            newEpisode(urlWithIndex) {
-                this.name = epTitle
-                this.episode = episodeNumber
-            }
-        }.reversed() 
-
-        return newAnimeLoadResponse(title, url, tvType) {
-            this.posterUrl = posterUrl
-            this.plot = description
-            this.tags = tags
-
-            if (episodes.isNotEmpty()) addEpisodes(defaultDubStatus, episodes)
+        } catch (e: Exception) {
+            hasMorePages = false
         }
     }
+    
+    return allEpisodes.sortedByDescending { it.episode }
+}
+
+private fun isFirstPageRedirect(document: org.jsoup.nodes.Document, originalUrl: String): Boolean {
+    val currentUrl = document.selectFirst("meta[property=og:url]")?.attr("content")
+    return currentUrl != null && !currentUrl.contains("/page/") && originalUrl.contains("/page/")
+}
+
+// Função para extrair episódios de uma única página
+private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Episode> {
+    val episodeLinks = document.select(".item_ep a")
+    
+    return episodeLinks.mapNotNull { epElement ->
+        val epUrl = epElement.attr("href").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        
+        val titleElement = epElement.selectFirst("div.title_anime")
+        var epTitle = titleElement?.text()?.trim()
+        
+        if (epTitle.isNullOrEmpty()) {
+            val imgTag = epElement.selectFirst("img")
+            epTitle = imgTag?.attr("title")?.replace("Assistir ", "") ?: "Título Desconhecido"
+        }
+        
+        epTitle = epTitle?.replace("Episodio ", "Episódio ") ?: "Episódio"
+        
+        val episodeNumber = extractEpisodeNumber(epTitle, epUrl)
+        
+        val urlWithIndex = "$epUrl|#|$episodeNumber"
+
+        newEpisode(urlWithIndex) {
+            this.name = epTitle
+            this.episode = episodeNumber
+        }
+    }
+}
 
     // Função auxiliar para extrair número do episódio
     private fun extractEpisodeNumber(title: String, url: String): Int {
