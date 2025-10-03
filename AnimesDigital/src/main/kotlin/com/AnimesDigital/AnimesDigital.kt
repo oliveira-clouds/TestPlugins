@@ -401,9 +401,6 @@ private fun extractCurrentEpisodeNumber(url: String, title: String): Int {
 
     // Ano - extrai do .dados .info
     val year = infoContainer.selectFirst(".dados .info:contains(Ano)")?.text()?.replace("Ano", "")?.trim()?.toIntOrNull()
-
-    // Estúdio - extrai do .dados .info
-    val studio = infoContainer.selectFirst(".dados .info:contains(Estúdio)")?.text()?.replace("Estúdio", "")?.trim()
     
     val statusText = infoContainer.selectFirst(".status span")?.text()?.trim()
     val status = statusText.toStatus()
@@ -432,7 +429,6 @@ private fun extractCurrentEpisodeNumber(url: String, title: String): Int {
         this.plot = description
         this.tags = tags
         this.year = year
-        this.studio = studio
 
         if (allEpisodes.isNotEmpty()) addEpisodes(defaultDubStatus, allEpisodes)
     }
