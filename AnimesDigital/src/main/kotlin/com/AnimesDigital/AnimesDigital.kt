@@ -273,30 +273,66 @@ class AnimesDigitalProvider : MainAPI() {
     }
 
     private suspend fun loadEpisode(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
-        val title = document.selectFirst("meta[property=og:title]")?.attr("content") ?: return null
-        val poster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
-        val description = document.selectFirst("meta[property=og:description]")?.attr("content")
-        
-        // Extrai informações do anime
-        val animeTitle = document.selectFirst(".info span:contains(Anime) + span")?.text() ?: title
-        
-        // Lista de episódios
-        val episodes = document.select(".episode_list_episodes_item").mapNotNull { episodeElement ->
-            val epUrl = episodeElement.attr("href")
-            val epNum = episodeElement.selectFirst(".episode_list_episodes_num")?.text()?.toIntOrNull() ?: 1
-            val urlWithIndex = "$epUrl|#|$epNum" 
-            newEpisode(urlWithIndex) {
-                this.name = "Episódio $epNum"
-                this.episode = epNum
-            }
-        }.reversed()
-
-        return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
-            this.posterUrl = poster
-            this.plot = description
-            addEpisodes(DubStatus.Subbed, episodes)
-        }
+    val title = document.selectFirst("meta[property=og:title]")?.attr("content") ?: return null
+    val poster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
+    val description = document.selectFirst("meta[property=og:description]")?.attr("content")
+    
+    
+    val animeTitle = document.selectFirst(".info span:contains(Anime) + span")?.text() 
+        ?: document.selectFirst("#anime_title")?.text()?.replace(" Episódio \\d+".toRegex(), "")?.trim()
+        ?: title
+    
+    
+    val currentEpisodeNumber = extractCurrentEpisodeNumber(url, title)
+    
+   
+    val currentEpisode = newEpisode(url) {
+        this.name = "Episódio $currentEpisodeNumber"
+        this.episode = currentEpisodeNumber
     }
+    
+    // Lista de episódios da sidebar
+    val sidebarEpisodes = document.select(".episode_list_episodes_item").mapNotNull { episodeElement ->
+        val epUrl = episodeElement.attr("href")
+        val epNum = episodeElement.selectFirst(".episode_list_episodes_num")?.text()?.toIntOrNull() ?: 1
+        val urlWithIndex = "$epUrl|#|$epNum" 
+        newEpisode(urlWithIndex) {
+            this.name = "Episódio $epNum"
+            this.episode = epNum
+        }
+    }.reversed()
+
+    // Combina todos os episódios (atual + sidebar)
+    val allEpisodes = mutableListOf<Episode>()
+    allEpisodes.add(currentEpisode)
+    allEpisodes.addAll(sidebarEpisodes)
+
+    return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
+        this.posterUrl = poster
+        this.plot = description
+        addEpisodes(DubStatus.Subbed, allEpisodes)
+    }
+}
+
+
+private fun extractCurrentEpisodeNumber(url: String, title: String): Int {
+   
+    val urlMatch = Regex("""/a/(\d+)/""").find(url)
+    urlMatch?.let {
+        // Se a URL tem um ID numérico, tenta mapear para número do episódio
+        // Ou usa um fallback baseado no título
+    }
+    
+    // Tenta extrair do título
+    val titleMatch = Regex("""Epis[oó]dio\s*(\d+)""", RegexOption.IGNORE_CASE).find(title)
+    titleMatch?.let {
+        return it.groupValues[1].toIntOrNull() ?: 1
+    }
+    
+    // Fallback: tenta encontrar qualquer número no título
+    val anyNumberMatch = Regex("""\b(\d+)\b""").find(title)
+    return anyNumberMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
+}
 
     private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
         val infoContainer = document.selectFirst(".single_anime, .single-content") ?: document
