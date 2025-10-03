@@ -371,10 +371,11 @@ private fun extractCurrentEpisodeNumber(url: String, title: String): Int {
     return anyNumberMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
 }
 
-    private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
-    val infoContainer = document.selectFirst(".single_anime, .single-content") ?: document
+   private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
+    val infoContainer = document.selectFirst(".single_anime, .single-content, .dados") ?: document
 
-    val title = infoContainer.selectFirst("h1.single-title, h1")?.text()?.trim() 
+    // Título - agora pega do .dados h1
+    val title = infoContainer.selectFirst(".dados h1, h1.single-title, h1")?.text()?.trim() 
         ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.let { content ->
             if (content.contains(" - Animes Online")) {
                 content.substringBefore(" - Animes Online").trim()
@@ -384,15 +385,25 @@ private fun extractCurrentEpisodeNumber(url: String, title: String): Int {
         }
         ?: document.selectFirst("h1, h2")?.text() ?: return null
 
+    // Poster
     val poster = infoContainer.selectFirst(".foto img")?.attr("src") 
         ?: document.selectFirst("img[src*=/uploads/]")?.attr("src") 
         ?: document.selectFirst("meta[property=og:image]")?.attr("content")
     val posterUrl = fixUrlNull(poster)
     
-    val description = infoContainer.selectFirst(".sinopse p")?.text()?.trim() 
+    // Descrição - agora pega do .dados .sinopse
+    val description = infoContainer.selectFirst(".dados .sinopse, .sinopse p")?.text()?.trim() 
         ?: document.selectFirst("meta[property=og:description]")?.attr("content")
 
-    val tags = infoContainer.select(".generos a, .single-meta a[href*='genero']").map { it.text().trim() }
+    // Tags/Gêneros - agora pega do .dados .genres
+    val tags = infoContainer.select(".dados .genres a, .generos a, .single-meta a[href*='genero']")
+        .map { it.text().trim() }
+
+    // Ano - extrai do .dados .info
+    val year = infoContainer.selectFirst(".dados .info:contains(Ano)")?.text()?.replace("Ano", "")?.trim()?.toIntOrNull()
+
+    // Estúdio - extrai do .dados .info
+    val studio = infoContainer.selectFirst(".dados .info:contains(Estúdio)")?.text()?.replace("Estúdio", "")?.trim()
     
     val statusText = infoContainer.selectFirst(".status span")?.text()?.trim()
     val status = statusText.toStatus()
@@ -409,49 +420,56 @@ private fun extractCurrentEpisodeNumber(url: String, title: String): Int {
             this.posterUrl = posterUrl
             this.plot = description
             this.tags = tags
+            this.year = year
         }
     }
 
-    // CARREGA TODOS OS EPISÓDIOS (TODAS AS PÁGINAS)
+    // Carrega todos os episódios
     val allEpisodes = loadAllEpisodes(url, document)
 
     return newAnimeLoadResponse(title, url, tvType) {
         this.posterUrl = posterUrl
         this.plot = description
         this.tags = tags
+        this.year = year
+        this.studio = studio
 
         if (allEpisodes.isNotEmpty()) addEpisodes(defaultDubStatus, allEpisodes)
     }
 }
 
-// Função para carregar todos os episódios de todas as páginas
 private suspend fun loadAllEpisodes(initialUrl: String, initialDocument: org.jsoup.nodes.Document): List<Episode> {
     val allEpisodes = mutableListOf<Episode>()
     
     // Carrega primeira página
-    allEpisodes.addAll(extractEpisodesFromPage(initialDocument))
+    val firstPageEpisodes = extractEpisodesFromPage(initialDocument)
+    allEpisodes.addAll(firstPageEpisodes)
     
-    var currentPage = 1
+    // Carrega páginas sequencialmente começando da página 2
+    var page = 2
     var hasMorePages = true
     
-    while (hasMorePages && currentPage < 50) { // Limite de segurança
-        currentPage++
-        
-        val nextPageUrl = if (initialUrl.contains("/page/")) {
-            initialUrl.replace(Regex("/page/\\d+/"), "/page/$currentPage/")
-        } else {
-            "${initialUrl.removeSuffix("/")}/page/$currentPage/"
-        }
+    while (hasMorePages && page <= 20) {
+        val pageUrl = buildNextPageUrl(initialUrl, page)
         
         try {
-            val nextDocument = app.get(nextPageUrl).document
-            val nextEpisodes = extractEpisodesFromPage(nextDocument)
+            val pageDocument = app.get(pageUrl).document
+            val pageEpisodes = extractEpisodesFromPage(pageDocument)
             
-            // Se não encontrou episódios ou se a página redirecionou para a primeira
-            if (nextEpisodes.isEmpty() || isFirstPageRedirect(nextDocument, initialUrl)) {
-                hasMorePages = false
+            if (pageEpisodes.isNotEmpty()) {
+                // Verifica se são episódios diferentes
+                val newEpisodes = pageEpisodes.filter { newEp ->
+                    allEpisodes.none { existingEp -> existingEp.episode == newEp.episode }
+                }
+                
+                if (newEpisodes.isNotEmpty()) {
+                    allEpisodes.addAll(newEpisodes)
+                    page++
+                } else {
+                    hasMorePages = false
+                }
             } else {
-                allEpisodes.addAll(nextEpisodes)
+                hasMorePages = false
             }
             
         } catch (e: Exception) {
@@ -460,6 +478,14 @@ private suspend fun loadAllEpisodes(initialUrl: String, initialDocument: org.jso
     }
     
     return allEpisodes.sortedByDescending { it.episode }
+}
+
+private fun buildNextPageUrl(baseUrl: String, page: Int): String {
+    return if (baseUrl.contains("/page/")) {
+        baseUrl.replace(Regex("/page/\\d+/"), "/page/$page/")
+    } else {
+        "${baseUrl.removeSuffix("/")}/page/$page/"
+    }
 }
 
 private fun isFirstPageRedirect(document: org.jsoup.nodes.Document, originalUrl: String): Boolean {
