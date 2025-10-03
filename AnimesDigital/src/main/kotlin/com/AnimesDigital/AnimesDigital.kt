@@ -189,7 +189,7 @@ class AnimesDigitalProvider : MainAPI() {
     val title = titleElement.text().trim()
     val posterUrl = selectFirst("img")?.attr("src") ?: selectFirst("img")?.attr("data-src")
     
-    val isMovie = href.contains("/filmes/", ignoreCase = true) || 
+    val isMovie = href.contains("/filme/", ignoreCase = true) || 
                   title.contains("filme", ignoreCase = true)
     
     return if (title.isNotEmpty() && href.isNotEmpty()) {
@@ -237,7 +237,7 @@ class AnimesDigitalProvider : MainAPI() {
     val document = app.get("$mainUrl/?s=$query").document
     return document.select("div.itemE, div.itemA").mapNotNull {
         val href = it.selectFirst("a")?.attr("href") ?: ""
-        val isMovie = href.contains("/filmes/", ignoreCase = true)
+        val isMovie = href.contains("/filme/", ignoreCase = true)
         
         if (isMovie) {
             // Para filmes, usa o método alternativo
@@ -324,7 +324,7 @@ class AnimesDigitalProvider : MainAPI() {
         val statusText = infoContainer.selectFirst(".status span")?.text()?.trim()
         val status = statusText.toStatus()
 
-        val tvType = if (url.contains("/filmes/", ignoreCase = true)) TvType.Movie else TvType.Anime
+        val tvType = if (url.contains("/filme/", ignoreCase = true)) TvType.Movie else TvType.Anime
         
         val defaultDubStatus = when {
             url.contains("dublado", ignoreCase = true) || url.contains("desenhos", ignoreCase = true) -> DubStatus.Dubbed
@@ -405,7 +405,7 @@ class AnimesDigitalProvider : MainAPI() {
     val episodeNum = parts.getOrNull(1)?.toIntOrNull() ?: 1
 
     val document = app.get(realUrl).document
-    val isMoviePage = realUrl.contains("/filmes/", ignoreCase = true)
+    val isMoviePage = realUrl.contains("/filme/", ignoreCase = true)
 
     // CORREÇÃO PARA FILMES - tratamento simplificado
     if (isMoviePage) {
