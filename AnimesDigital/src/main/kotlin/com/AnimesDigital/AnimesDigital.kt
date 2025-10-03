@@ -330,11 +330,12 @@ class AnimesDigitalProvider : MainAPI() {
         }
     }.reversed()
 
-    return newAnimeLoadResponse(title, url, tvType) {
+     return newAnimeLoadResponse(title, url, tvType) {
         this.posterUrl = posterUrl
         this.plot = description
         this.tags = tags
-        this.episodes = episodes  
+        
+        addEpisodes(DubStatus.Subbed, episodes)
     }
 }
 private fun extractEpisodeNumber(title: String, url: String): Int {
