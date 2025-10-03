@@ -46,7 +46,15 @@ class AnimesDigitalProvider : MainAPI() {
             }
         }
     }
-
+    private suspend fun getSecurityToken(url: String): String? {
+        return try {
+           
+            val document = app.get(url).document 
+            document.selectFirst(".menu_filter_box")?.attr("data-secury")
+        } catch (e: Exception) {
+            null
+        }
+    }
     private suspend fun getAnimesFromAPI(page: Int, request: MainPageRequest): HomePageResponse {
         val (typeUrl, filterAudio) = when {
             request.data.contains("animes-dublado") -> "animes" to "dublado"
@@ -56,7 +64,8 @@ class AnimesDigitalProvider : MainAPI() {
             else -> "animes" to "animes"
         }
 
-        // Construir referrer exato como o navegador
+        val dynamicToken = getSecurityToken(request.data) ?: "c1deb78cd4" // Fallback para o token antigo se falhar
+        
         val referrerParams = mapOf(
             "filter_letter" to "0",
             "type_url" to typeUrl,
@@ -78,11 +87,8 @@ class AnimesDigitalProvider : MainAPI() {
 
         val filtersJson = """{"filter_data":"filter_letter=0&type_url=$typeUrl&filter_audio=$filterAudio&filter_order=name","filter_genre_add":[],"filter_genre_del":[]}"""
 
-        // ATENÇÃO: O token da API (c1deb78cd4) é estático e pode expirar novamente, 
-        // causando a falha no carregamento. Se a lista parar de carregar, 
-        // este token será o provável culpado.
         val postData = mapOf(
-            "token" to "c1deb78cd4", 
+            "token" to dynamicToken, 
             "pagina" to page.toString(),
             "search" to "0",
             "limit" to "30",
@@ -343,7 +349,7 @@ class AnimesDigitalProvider : MainAPI() {
             this.posterUrl = posterUrl
             this.plot = description
             this.tags = tags
-            
+
             if (episodes.isNotEmpty()) addEpisodes(defaultDubStatus, episodes)
         }
     }
