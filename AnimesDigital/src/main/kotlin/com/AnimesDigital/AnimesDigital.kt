@@ -277,24 +277,26 @@ class AnimesDigitalProvider : MainAPI() {
     val poster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
     val description = document.selectFirst("meta[property=og:description]")?.attr("content")
     
-    
+    // Extrai informações do anime
     val animeTitle = document.selectFirst(".info span:contains(Anime) + span")?.text() 
         ?: document.selectFirst("#anime_title")?.text()?.replace(" Episódio \\d+".toRegex(), "")?.trim()
         ?: title
     
-    
+    // Extrai número do episódio atual
     val currentEpisodeNumber = extractCurrentEpisodeNumber(url, title)
     
-   
+    // Cria o episódio atual
     val currentEpisode = newEpisode(url) {
         this.name = "Episódio $currentEpisodeNumber"
         this.episode = currentEpisodeNumber
     }
     
-  
+    // Lista de episódios da sidebar
     val sidebarEpisodes = document.select(".episode_list_episodes_item").mapNotNull { episodeElement ->
         val epUrl = episodeElement.attr("href")
         val epNum = episodeElement.selectFirst(".episode_list_episodes_num")?.text()?.toIntOrNull() ?: 1
+        if (epNum == currentEpisodeNumber) return@mapNotNull null
+        
         val urlWithIndex = "$epUrl|#|$epNum" 
         newEpisode(urlWithIndex) {
             this.name = "Episódio $epNum"
@@ -302,22 +304,21 @@ class AnimesDigitalProvider : MainAPI() {
         }
     }
 
-    // Combina todos os episódios (atual + sidebar)
+    // Combina todos os episódios
     val allEpisodes = mutableListOf<Episode>()
     allEpisodes.addAll(sidebarEpisodes)
     allEpisodes.add(currentEpisode)
-    
-     // EXTRAI O LINK DA PÁGINA PRINCIPAL DO ANIME
-    val animeUrl = document.selectFirst(".epsL a[href]")?.attr("href") 
-        ?: document.selectFirst("a[href*='/anime/a/']")?.attr("href")
 
+    // EXTRAI O LINK DA PÁGINA PRINCIPAL DO ANIME DE VÁRIAS FORMAS
+    val animeUrl = extractAnimeMainPageUrl(document, url)
 
     return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
         this.posterUrl = poster
         this.plot = description
         addEpisodes(DubStatus.Subbed, allEpisodes)
 
-         if (animeUrl != null) {
+        // Adiciona recomendação para página principal
+        if (animeUrl != null) {
             this.recommendations = listOf(
                 newAnimeSearchResponse("Ver todos os episódios", fixUrl(animeUrl), TvType.Anime) {
                     this.posterUrl = poster
@@ -325,6 +326,37 @@ class AnimesDigitalProvider : MainAPI() {
             )
         }
     }
+}
+
+// Função auxiliar para extrair URL da página principal
+private fun extractAnimeMainPageUrl(document: org.jsoup.nodes.Document, currentUrl: String): String? {
+    // Tenta de várias formas:
+    
+    // 1. Do elemento .epsL (seção de navegação)
+    val epslLink = document.selectFirst(".epsL a[href]")?.attr("href")
+    if (epslLink != null && epslLink.contains("/anime/a/")) {
+        return epslLink
+    }
+    
+    // 2. De qualquer link que contenha "/anime/a/"
+    val animeLink = document.selectFirst("a[href*='/anime/a/']")?.attr("href")
+    if (animeLink != null) {
+        return animeLink
+    }
+    
+    // 3. Tenta construir a URL a partir da URL atual
+    val animeSlug = extractAnimeSlugFromUrl(currentUrl)
+    if (animeSlug != null) {
+        return "https://animesdigital.org/anime/a/$animeSlug"
+    }
+    
+    return null
+}
+
+// Função para extrair slug do anime da URL
+private fun extractAnimeSlugFromUrl(url: String): String? {
+    val match = Regex("""/video/a/([^/]+)/""").find(url)
+    return match?.groupValues?.get(1)
 }
 
 
