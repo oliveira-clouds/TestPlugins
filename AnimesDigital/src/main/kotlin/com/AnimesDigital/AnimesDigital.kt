@@ -16,7 +16,7 @@ class AnimesDigitalProvider : MainAPI() {
     override val hasDownloadSupport = true
 
     override val mainPage = mainPageOf(
-        "$mainUrl/lancamentos" to "Últimos Episódios",
+        "$mainUrl/home" to "Últimos Episódios",
         "$mainUrl/animes-legendados-online" to "Animes Legendados", 
         "$mainUrl/animes-dublado" to "Animes Dublados",
         "$mainUrl/filmes" to "Filmes",
@@ -25,7 +25,7 @@ class AnimesDigitalProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         return when {
-            request.data.contains("lancamentos") -> {
+            request.data.contains("home") -> {
                 val document = app.get(request.data).document
                 val home = document.select(".itemE, .itemA").mapNotNull {
                     it.toSearchResult()
@@ -291,7 +291,7 @@ class AnimesDigitalProvider : MainAPI() {
         this.episode = currentEpisodeNumber
     }
     
-    // Lista de episódios da sidebar
+  
     val sidebarEpisodes = document.select(".episode_list_episodes_item").mapNotNull { episodeElement ->
         val epUrl = episodeElement.attr("href")
         val epNum = episodeElement.selectFirst(".episode_list_episodes_num")?.text()?.toIntOrNull() ?: 1
@@ -300,12 +300,13 @@ class AnimesDigitalProvider : MainAPI() {
             this.name = "Episódio $epNum"
             this.episode = epNum
         }
-    }.reversed()
+    }
 
     // Combina todos os episódios (atual + sidebar)
     val allEpisodes = mutableListOf<Episode>()
-    allEpisodes.add(currentEpisode)
     allEpisodes.addAll(sidebarEpisodes)
+    allEpisodes.add(currentEpisode)
+    
 
     return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
         this.posterUrl = poster
