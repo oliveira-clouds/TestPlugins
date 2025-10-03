@@ -193,17 +193,29 @@ class AnimesDigitalProvider : MainAPI() {
         }
     }
 
-    // Seu método original
-    private fun Element.toSearchResult(): SearchResponse? {
-        val titleElement = selectFirst("a") ?: return null
-        val href = titleElement.attr("href")
-        val title = selectFirst(".title_anime")?.text()?.trim() ?: return null
-        val posterUrl = selectFirst("img")?.attr("src")
-        
-        return newAnimeSearchResponse(title, href) {
-            this.posterUrl = fixUrlNull(posterUrl)
-        }
+    
+   private fun Element.toSearchResult(): SearchResponse? {
+    val titleElement = selectFirst("a") ?: return null
+    val href = titleElement.attr("href")
+    val animeTitle = selectFirst(".title_anime")?.text()?.trim() ?: return null
+    val episodeNumberText = selectFirst(".number")?.text()?.trim() ?: return null
+    val posterUrl = selectFirst("img")?.attr("src")
+    
+    
+    val episodeNumber = episodeNumberText.filter { it.isDigit() }.toIntOrNull() ?: 1
+    
+ 
+    val isDub = animeTitle.contains("dublado", ignoreCase = true) || 
+                href.contains("dublado", ignoreCase = true) ||
+                episodeNumberText.contains("dublado", ignoreCase = true)
+    
+    val fullTitle = "$animeTitle - $episodeNumberText"
+    
+    return newAnimeSearchResponse(fullTitle, href, TvType.Anime) {
+        this.posterUrl = fixUrlNull(posterUrl)
+        this.addDubStatus(isDub, episodeNumber)
     }
+}
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query").document
@@ -262,10 +274,9 @@ class AnimesDigitalProvider : MainAPI() {
         }
     }
 
-   private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
+  private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
     val infoContainer = document.selectFirst(".single_anime, .single-content") ?: document
 
-    // EXTRAÇÃO DE METADADOS (mantenha igual)
     val title = infoContainer.selectFirst("h1.single-title, h1")?.text()?.trim() 
         ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.let { content ->
             if (content.contains(" - Animes Online")) {
@@ -290,35 +301,25 @@ class AnimesDigitalProvider : MainAPI() {
     val status = statusText.toStatus()
 
     val tvType = if (url.contains("/filmes/", ignoreCase = true)) TvType.Movie else TvType.Anime
-    
-    val defaultDubStatus = when {
-        url.contains("dublado", ignoreCase = true) || url.contains("desenhos", ignoreCase = true) -> DubStatus.Dubbed
-        else -> DubStatus.Subbed
-    }
 
-    // EXTRAÇÃO DE EPISÓDIOS - CORRIGIDA baseada no código Python
+    // EXTRAÇÃO DE EPISÓDIOS - SIMPLIFICADA
     val episodeLinks = document.select(".item_ep a")
-
-    // Debug para verificar
-    println("DEBUG: Encontradas ${episodeLinks.size} tags <a> de episódios")
 
     val episodes = episodeLinks.mapNotNull { epElement ->
         val epUrl = epElement.attr("href").takeIf { it.isNotBlank() } ?: return@mapNotNull null
         
-        // Extrai o título igual ao código Python
         val titleElement = epElement.selectFirst("div.title_anime")
         var epTitle = titleElement?.text()?.trim()
         
         if (epTitle.isNullOrEmpty()) {
-            // Fallback: tenta pegar do atributo title da imagem
+          
             val imgTag = epElement.selectFirst("img")
-            epTitle = imgTag?.attr("title")?.replace("Assistir ", "") ?: "Título Desconhecido"
+            epTitle = imgTag?.attr("title")?.replace("Assistir ", "") ?: "Episódio"
         }
         
-        // Limpeza do título igual ao Python
-        epTitle = epTitle?.replace("Episodio ", "Episódio ") ?: "Episódio"
+        epTitle = epTitle.replace("Episodio ", "Episódio ")
         
-        // Extrai número do episódio de forma mais robusta
+
         val episodeNumber = extractEpisodeNumber(epTitle, epUrl)
         
         val urlWithIndex = "$epUrl|#|$episodeNumber"
@@ -327,36 +328,16 @@ class AnimesDigitalProvider : MainAPI() {
             this.name = epTitle
             this.episode = episodeNumber
         }
-    }.reversed() // Inverte a lista igual ao Python
-
-    println("DEBUG: ${episodes.size} episódios processados após reversão")
-
-    // Separa episódios dublados e legendados
-    val dubEpisodes = episodes.filter { episode ->
-        episode.name?.contains("dublado", ignoreCase = true) == true || 
-        defaultDubStatus == DubStatus.Dubbed
-    }
-    
-    val subEpisodes = episodes.filter { episode ->
-        episode.name?.contains("dublado", ignoreCase = true) != true || 
-        defaultDubStatus == DubStatus.Subbed
-    }
-
-    println("DEBUG: ${dubEpisodes.size} episódios dublados, ${subEpisodes.size} episódios legendados")
+    }.reversed()
 
     return newAnimeLoadResponse(title, url, tvType) {
         this.posterUrl = posterUrl
         this.plot = description
         this.tags = tags
-
-        if (dubEpisodes.isNotEmpty()) addEpisodes(DubStatus.Dubbed, dubEpisodes)
-        if (subEpisodes.isNotEmpty()) addEpisodes(DubStatus.Subbed, subEpisodes)
+        this.episodes = episodes  
     }
 }
-
-// Função auxiliar para extrair número do episódio
 private fun extractEpisodeNumber(title: String, url: String): Int {
-    // Tenta extrair do título primeiro
     val patterns = listOf(
         Regex("""Epis[oó]dio\s*(\d+)""", RegexOption.IGNORE_CASE),
         Regex("""Cap\.?\s*(\d+)""", RegexOption.IGNORE_CASE),
@@ -370,7 +351,6 @@ private fun extractEpisodeNumber(title: String, url: String): Int {
         }
     }
     
-    // Fallback: tenta extrair da URL
     val urlMatch = Regex("""[\/\-](\d+)[\/\-]?""").find(url)
     return urlMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
 }
