@@ -237,15 +237,7 @@ class AnimesDigitalProvider : MainAPI() {
     val document = app.get("$mainUrl/?s=$query").document
     return document.select("div.itemE, div.itemA").mapNotNull {
         val href = it.selectFirst("a")?.attr("href") ?: ""
-        val isMovie = href.contains("/filme/", ignoreCase = true)
-        
-        if (isMovie) {
-            // Para filmes, usa o método alternativo
-            it.toSearchResultAlternative()
-        } else {
-            // Para episódios, usa o método principal
-            it.toSearchResult()
-        }
+        it.toSearchResultAlternative()
     }
 }
 
