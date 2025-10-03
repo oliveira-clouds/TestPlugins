@@ -26,7 +26,6 @@ class AnimesDigitalProvider : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         return when {
             request.data.contains("lancamentos") -> {
-                // Página de lançamentos - scraping tradicional (usa toSearchResult, pois é lista de episódios)
                 val document = app.get(request.data).document
                 val home = document.select(".itemE, .itemA").mapNotNull {
                     it.toSearchResult()
@@ -41,7 +40,6 @@ class AnimesDigitalProvider : MainAPI() {
                 )
             }
             else -> {
-                // Todas as outras categorias - usar API (precisa da correção na parseApiResponse)
                 getAnimesFromAPI(page, request)
             }
         }
@@ -137,15 +135,10 @@ class AnimesDigitalProvider : MainAPI() {
 
             for (i in 0 until resultsArray.length()) {
                 val escapedHtml = resultsArray.optString(i) ?: continue
-
-                // Limpar as barras de escape
                 val cleanHtml = escapedHtml.replace("\\\"", "\"").replace("\\/", "/") 
                 
-                // Parsear o HTML
                 val document = org.jsoup.Jsoup.parseBodyFragment(cleanHtml)
                 
-                // CORREÇÃO: Usar toSearchResultAlternative() para listas de Animes/Filmes, 
-                // pois eles não têm número de episódio (.number).
                 val searchResult = document.selectFirst(".itemA")?.toSearchResultAlternative() 
                 
                 if (searchResult != null) {
@@ -240,14 +233,14 @@ class AnimesDigitalProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         
-        // Se a URL for de episódio, chama loadEpisode
+       
         val isEpisode = url.contains("/video/a/")
 
         if (isEpisode) {
             return loadEpisode(url, document)
         } 
         
-        // Se for URL de detalhes de Anime/Filme
+    
         return loadAnime(url, document)
     }
 
@@ -318,7 +311,12 @@ class AnimesDigitalProvider : MainAPI() {
             url.contains("dublado", ignoreCase = true) || url.contains("desenhos", ignoreCase = true) -> DubStatus.Dubbed
             else -> DubStatus.Subbed
         }
-
+         val episodes = if (tvType == TvType.Movie) {
+            listOf(newEpisode(url) {
+                this.name = title 
+                this.episode = 1
+            })
+        }else{ 
         val episodeLinks = document.select(".item_ep a")
 
         val episodes = episodeLinks.mapNotNull { epElement ->
@@ -343,7 +341,7 @@ class AnimesDigitalProvider : MainAPI() {
                 this.episode = episodeNumber
             }
         }.reversed() 
-
+        }
 
         return newAnimeLoadResponse(title, url, tvType) {
             this.posterUrl = posterUrl
@@ -388,10 +386,19 @@ class AnimesDigitalProvider : MainAPI() {
         val episodeNum = parts.getOrNull(1)?.toIntOrNull() ?: 1
 
         val document = app.get(realUrl).document
-        
-        document.select(".tab-video").forEach { player ->
-            val iframe = player.selectFirst("iframe")
-            val iframeSrc = iframe?.attr("src") ?: return@forEach
+        val isMoviePage = realUrl.contains("/filme/", ignoreCase = true)
+
+        // Para filmes, o iframe é o player principal (dentro de #player1). 
+        // Para séries, os iframes estão dentro de .tab-video.
+        val playerElements = if (isMoviePage) {
+            // Se for filme, seleciona o iframe principal
+            document.select("#player1 iframe[src]") 
+        } else {
+            // Se for série/episódio, seleciona os players dentro das abas
+            document.select(".tab-video iframe[src]")
+        }
+          playerElements.forEach { iframe ->
+            val iframeSrc = iframe.attr("src") ?: return@forEach
             
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
@@ -414,9 +421,13 @@ class AnimesDigitalProvider : MainAPI() {
                     val playerPage = app.get(url).document
                     
                     val allIframes = playerPage.select(".post-body iframe[src]")
-                    val targetIndex = episodeNum - 1
-                    
-                    val targetIframe = allIframes.getOrNull(targetIndex)
+                    val targetIframe = if (isMoviePage) {
+                        // Se for filme, usa o primeiro iframe da página decodificada
+                        allIframes.firstOrNull()
+                    } else {
+                        // Se for série, usa o iframe baseado no número do episódio
+                        allIframes.getOrNull(episodeNum - 1)
+                    }
                     
                     val finalLink = targetIframe?.attr("src")
                     
