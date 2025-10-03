@@ -296,17 +296,14 @@ class AnimesDigitalProvider : MainAPI() {
             else -> DubStatus.Subbed
         }
 
-       val episodesList = document.select(".item_ep")
+    var episodesList = document.select(".item_ep")
 
 val episodes = episodesList.mapNotNull { epContainer ->
-    // 1. Encontrar a tag <a> dentro do .item_ep
     val epElement = epContainer.selectFirst("a")
 
     if (epElement != null) {
-        // 2. Extrair o link (href) da tag <a>
         val epUrl = epElement.attr("href")
 
-        // 3. Extrair o título da sub-tag com classe .title_anime
         val titleElement = epElement.selectFirst(".title_anime")
         val epTitle = titleElement?.text()?.trim() ?: ""
 
@@ -332,6 +329,7 @@ val subEpisodes = episodes.filter { episode ->
     episode.name?.contains("dublado", ignoreCase = true) != true || defaultDubStatus == DubStatus.Subbed
 }
 
+// O resto das variáveis (title, posterUrl, plot, tags) vêm de extrações anteriores na função 'load'.
 return newAnimeLoadResponse(title, url, tvType) {
     this.posterUrl = posterUrl
     this.plot = description
@@ -339,7 +337,8 @@ return newAnimeLoadResponse(title, url, tvType) {
 
     if (dubEpisodes.isNotEmpty()) addEpisodes(DubStatus.Dubbed, dubEpisodes)
     if (subEpisodes.isNotEmpty()) addEpisodes(DubStatus.Subbed, subEpisodes)
-     }
+}
+ 
     }
 
     override suspend fun loadLinks(
