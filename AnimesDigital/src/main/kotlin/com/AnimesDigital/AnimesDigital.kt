@@ -343,8 +343,7 @@ class AnimesDigitalProvider : MainAPI() {
             this.posterUrl = posterUrl
             this.plot = description
             this.tags = tags
-            this.addStatus(status)
-
+            
             if (episodes.isNotEmpty()) addEpisodes(defaultDubStatus, episodes)
         }
     }
