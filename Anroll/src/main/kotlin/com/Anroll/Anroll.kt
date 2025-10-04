@@ -144,16 +144,14 @@ class Anroll : MainAPI() {
         } else {
             null
         }
-        val seriesCoverUrl = if (slugSerie.isNotEmpty()) {
+        val seriesCoverUrl = if (slug.isNotEmpty()) {
         "https://static.anroll.net/images/animes/capas/$slug.jpg"
          } else {
         null
         }
-        val episodePoster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
-        
         
         return newAnimeSearchResponse(title, url, TvType.Anime) {
-            this.posterUrl = posterUrl ?: episodePoster ?: seriesCoverUrl
+            this.posterUrl = posterUrl ?: seriesCoverUrl
             this.addDubStatus(isDub, episodeNumber)
         }
     }
@@ -241,7 +239,16 @@ class Anroll : MainAPI() {
     }
     
     val episodePoster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
-    
+    val posterUrl = if (slugSerie.isNotEmpty()) {
+           "https://static.anroll.net/images/animes/screens/$slugSerie/${"%03d".format(episode)}.jpg"
+        } else {
+            null
+        }
+        val seriesCoverUrl = if (slug.isNotEmpty()) {
+        "https://static.anroll.net/images/animes/capas/$slugSerie.jpg"
+         } else {
+        null
+        }
 
     // Lógica para o nome do episódio
     val episodeName = if (!episodeTitle.isNullOrEmpty() && episodeTitle != "N/A") {
@@ -251,14 +258,14 @@ class Anroll : MainAPI() {
     }
 
     return newAnimeLoadResponse(title, url, TvType.Anime) {
-        this.posterUrl = episodePoster
+        this.posterUrl = episodePoster ?: posterUrl ?: seriesCoverUrl
         this.plot = episodePlot
         addEpisodes(DubStatus.Subbed, listOf(
             newEpisode(url) {
                 this.name = episodeName
                 this.episode = episode
                 this.description = episodePlot
-                this.posterUrl=episodePoster
+                this.posterUrl=episodePoster ?: posterUrl ?: seriesCoverUrl
             }
         ))
 
