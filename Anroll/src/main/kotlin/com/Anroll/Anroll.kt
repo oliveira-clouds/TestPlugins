@@ -203,49 +203,63 @@ class Anroll : MainAPI() {
         val isMoviePage = url.contains("/f/")
 
      if (isEpisodePage) {
-    val titleElement = document.selectFirst("div#epinfo h1 a span") ?: return null
-    val title = titleElement.text().trim()
-    val fullTitleText = document.selectFirst("h2#current_ep")?.text()
-     val episodeTitle = if (fullTitleText != null) {
-    // Encontra o último hífen no texto completo
-    val lastHyphenIndex = fullTitleText.lastIndexOf("-")
-    if (lastHyphenIndex != -1) {
-        // Pega o texto que vem depois do último hífen
-        fullTitleText.substring(lastHyphenIndex + 1).trim()
+    val scriptTag = document.selectFirst("script#__NEXT_DATA__")
+        ?: return null
+
+    val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
+    val jsonObject = JSONObject(scriptContent)
+    val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
+    
+    val episodeData = pageProps?.optJSONObject("data") ?: return null
+    
+    val animeData = episodeData.optJSONObject("anime") ?: return null
+
+    // Extração de dados do JSON
+    val title = animeData.optString("titulo")?.trim() ?: return null
+    val slugSerie = animeData.optString("slug_serie") ?: ""
+    val animeSeriesGenId = animeData.optString("generate_id") ?: "" // ID da série
+    
+    val episodeNumberText = episodeData.optString("n_episodio")
+    val episode = episodeNumberText.toIntOrNull() ?: 1
+    val episodeTitle = episodeData.optString("titulo_episodio")
+    val episodePlot = episodeData.optString("sinopse_episodio")
+
+    // Constrói o link para a página da série
+    val animeUrl = if (animeSeriesGenId.isNotEmpty()) {
+        "$mainUrl/a/$animeSeriesGenId"
     } else {
         null
     }
-} else {
-    null
-}
-    val poster = document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
-    val plot = document.selectFirst("div.sinopse")?.text()
-    val episodeNumberText = document.selectFirst("h2#current_ep b")?.text()
-    val episodeText = document.selectFirst("h2#current_ep b")?.text()
-    val episode = episodeText?.toIntOrNull() ?: 1
-    val episodeName = if (episodeTitle != null && episodeTitle != "N/A") {
-        "$episodeTitle"
+    
+    // Poster do episódio (gerado a partir do slug e número do episódio)
+    val episodePoster = if (slugSerie.isNotEmpty()) {
+        "https://static.anroll.net/images/animes/screens/$slugSerie/${String.format("%03d", episode.toString())}.jpg"
+    } else {
+        document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
+    }
+
+    val episodeName = if (!episodeTitle.isNullOrEmpty() && episodeTitle != "N/A") {
+        episodeTitle 
     } else {
         "Episódio $episodeNumberText"
     }
-    // link para a página principal do anime (pego do <a> do título do episódio)
-    val animeUrl = document.selectFirst("div#epinfo h1 a")?.attr("href")
 
     return newAnimeLoadResponse(title, url, TvType.Anime) {
-        this.posterUrl = poster
-        this.plot = plot
+        this.posterUrl = episodePoster
+        this.plot = episodePlot
         addEpisodes(DubStatus.Subbed, listOf(
             newEpisode(url) {
                 this.name = episodeName
                 this.episode = episode
+                this.description = episodePlot
             }
         ))
 
-        // botão extra "Ver todos os episódios"
+        // Adiciona a recomendação "Ver todos os episódios"
         if (animeUrl != null) {
             this.recommendations = listOf(
                 newAnimeSearchResponse("Ver todos os episódios", fixUrl(animeUrl), TvType.Anime) {
-                    this.posterUrl = poster
+                    this.posterUrl = episodePoster
                 }
             )
         }
@@ -263,7 +277,9 @@ class Anroll : MainAPI() {
             val plot = animeData.optString("sinopse")
             val idSerie = animeData?.optInt("id_serie", 0)
             val slugSerie = animeData?.optString("slug_serie") ?: ""
-
+            val genres = animeData.optString("generos")?.split(",")?.map { it.trim() }
+            val year = animeData.optInt("ano", 0)
+            val censura = animeData.optString("censura")
             val episodes = mutableListOf<Episode>()
 
             if (idSerie != null && idSerie != 0) {
@@ -309,6 +325,8 @@ class Anroll : MainAPI() {
             return newAnimeLoadResponse(title, url, TvType.Anime) {
                 this.posterUrl = htmlPoster
                 this.plot = plot
+                this.year = if (year != 0) year else null 
+                this.tags = genres
                 addEpisodes(DubStatus.Subbed, episodes.reversed())
             }
         }else if (isMoviePage) {
