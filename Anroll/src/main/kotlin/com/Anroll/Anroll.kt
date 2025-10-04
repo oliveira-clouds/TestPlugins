@@ -248,7 +248,7 @@ class Anroll : MainAPI() {
         } else {
             null
         }
-        val seriesCoverUrl = if (slug.isNotEmpty()) {
+        val seriesCoverUrl = if (slugSerie.isNotEmpty()) {
         "https://static.anroll.net/images/animes/capas/$slugSerie.jpg"
          } else {
         null
