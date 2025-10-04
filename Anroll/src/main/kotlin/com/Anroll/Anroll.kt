@@ -204,24 +204,26 @@ class Anroll : MainAPI() {
 
      if (isEpisodePage) {
     val scriptTag = document.selectFirst("script#__NEXT_DATA__")
-        ?: return null
+        ?: return null // Retorna null se a tag principal não for encontrada
 
     val scriptContent = Parser.unescapeEntities(scriptTag.html(), false)
     val jsonObject = JSONObject(scriptContent)
     val pageProps = jsonObject.optJSONObject("props")?.optJSONObject("pageProps")
     
+    // Tenta encontrar os dados no objeto 'data'
     val episodeData = pageProps?.optJSONObject("data") ?: return null
     
     val animeData = episodeData.optJSONObject("anime") ?: return null
 
-    // Extração de dados do JSON
+    // 1. Extração de dados da Série (Anime)
     val title = animeData.optString("titulo")?.trim() ?: return null
     val slugSerie = animeData.optString("slug_serie") ?: ""
     val animeSeriesGenId = animeData.optString("generate_id") ?: "" // ID da série
     
+    // 2. Extração de dados do Episódio
     val episodeNumberText = episodeData.optString("n_episodio")
     val episode = episodeNumberText.toIntOrNull() ?: 1
-    val episodeTitle = episodeData.optString("titulo_episodio")
+    val episodeTitle = episodeData.optString("titulo_episodio")?.trim()
     val episodePlot = episodeData.optString("sinopse_episodio")
 
     // Constrói o link para a página da série
@@ -231,13 +233,15 @@ class Anroll : MainAPI() {
         null
     }
     
-    // Poster do episódio (gerado a partir do slug e número do episódio)
-    val episodePoster = if (slugSerie.isNotEmpty()) {
-        "https://static.anroll.net/images/animes/screens/$slugSerie/${String.format("%03d", episode.toString())}.jpg"
+
+    val episodePoster = if (slugSerie.isNotEmpty() && episode > 0) {
+        "https://static.anroll.net/images/animes/screens/$slugSerie/${String.format("%03d", episode)}.jpg"
     } else {
-        document.selectFirst("img[alt]")?.attr("src")?.let { fixUrlNull(it) }
+        
+        document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
     }
 
+    // Lógica para o nome do episódio
     val episodeName = if (!episodeTitle.isNullOrEmpty() && episodeTitle != "N/A") {
         episodeTitle 
     } else {
