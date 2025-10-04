@@ -276,9 +276,9 @@ class AnimesDigitalProvider : MainAPI() {
     
     // Extrai número do episódio atual
     val currentEpisodeNumber = extractCurrentEpisodeNumber(url, title)
-    
+    val urlWithIndex = "$url|#|$currentEpisodeNumber"
     // Cria o episódio atual
-    val currentEpisode = newEpisode(url) {
+    val currentEpisode = newEpisode(urlWithIndex) {
         this.name = "Episódio $currentEpisodeNumber"
         this.episode = currentEpisodeNumber
     }
