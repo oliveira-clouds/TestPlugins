@@ -127,34 +127,38 @@ class Anroll : MainAPI() {
     }
 
      private fun parseLancamentoJson(entry: JSONObject?): SearchResponse? {
-        val episodeData = entry?.optJSONObject("episode") ?: return null
-        val animeData = episodeData.optJSONObject("anime") ?: return null
+    val episodeData = entry?.optJSONObject("episode") ?: return null
+    val animeData = episodeData.optJSONObject("anime") ?: return null
 
-        val title = animeData.optString("titulo")
-        val generateId = episodeData.optString("generate_id")
-        val isDub = animeData.optInt("dub") == 1
-        val episodeNumber = episodeData.optString("n_episodio")?.toIntOrNull() ?: 1
+    val title = animeData.optString("titulo")
+    val generateId = episodeData.optString("generate_id")
+    val isDub = animeData.optInt("dub") == 1
+    val episodeNumber = episodeData.optString("n_episodio")?.toIntOrNull() ?: 1
+    
+    val slug = animeData.optString("slug_serie")
 
-        if (title.isEmpty() || generateId.isEmpty()) return null
+    // Verifica se os dados essenciais existem
+    if (title.isEmpty() || generateId.isEmpty() || slug.isEmpty()) return null
 
-        val url = "$mainUrl/e/$generateId"
-        val slug = animeData.optString("slug_serie")
-        val posterUrl = if (slug.isNotEmpty()) {
-           "https://static.anroll.net/images/animes/screens/$slug/${"%03d".format(episodeNumber)}.jpg"
-        } else {
-            null
-        }
-        val seriesCoverUrl = if (slug.isNotEmpty()) {
-        "https://static.anroll.net/images/animes/capas/$slug.jpg"
-         } else {
+    val url = "$mainUrl/e/$generateId"
+    
+    val screenshotUrl = if (slug.isNotEmpty()) {
+        "https://static.anroll.net/images/animes/screens/$slug/${String.format("%03d", episodeNumber)}.jpg"
+    } else {
         null
-        }
-        
-        return newAnimeSearchResponse(title, url, TvType.Anime) {
-            this.posterUrl = posterUrl ?: seriesCoverUrl
-            this.addDubStatus(isDub, episodeNumber)
-        }
     }
+
+    val seriesCoverUrl = if (slug.isNotEmpty()) {
+        "https://static.anroll.net/images/animes/capas/$slug.jpg"
+    } else {
+        null
+    }
+    return newAnimeSearchResponse(title, url, TvType.Anime) {
+        // Implementando o fallback: Tenta o screenshot, se falhar, usa a capa da série.
+        this.posterUrl = screenshotUrl ?: seriesCoverUrl 
+        this.addDubStatus(isDub, episodeNumber)
+    }
+}
     
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "https://api-search.anroll.net/data?q=$query"
