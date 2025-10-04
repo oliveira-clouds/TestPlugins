@@ -233,13 +233,8 @@ class Anroll : MainAPI() {
         null
     }
     
-
-    val episodePoster = if (slugSerie.isNotEmpty() && episode > 0) {
-        "https://static.anroll.net/images/animes/screens/$slugSerie/${String.format("%03d", episode)}.jpg"
-    } else {
-        
-        document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
-    }
+    val episodePoster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
+    
 
     // Lógica para o nome do episódio
     val episodeName = if (!episodeTitle.isNullOrEmpty() && episodeTitle != "N/A") {
