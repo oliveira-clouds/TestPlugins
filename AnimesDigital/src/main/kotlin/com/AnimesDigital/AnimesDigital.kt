@@ -283,31 +283,13 @@ class AnimesDigitalProvider : MainAPI() {
         this.episode = currentEpisodeNumber
     }
     
-    // Lista de episódios da sidebar
-    val sidebarEpisodes = document.select(".episode_list_episodes_item").mapNotNull { episodeElement ->
-        val epUrl = episodeElement.attr("href")
-        val epNum = episodeElement.selectFirst(".episode_list_episodes_num")?.text()?.toIntOrNull() ?: 1
-        if (epNum == currentEpisodeNumber) return@mapNotNull null
-        
-        val urlWithIndex = "$epUrl|#|$epNum" 
-        newEpisode(urlWithIndex) {
-            this.name = "Episódio $epNum"
-            this.episode = epNum
-        }
-    }
-
-    // Combina todos os episódios
-    val allEpisodes = mutableListOf<Episode>()
-    allEpisodes.addAll(sidebarEpisodes)
-    allEpisodes.add(currentEpisode)
-
     // EXTRAI O LINK DA PÁGINA PRINCIPAL DO ANIME DE VÁRIAS FORMAS
     val animeUrl = extractAnimeMainPageUrl(document, url)
 
     return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
         this.posterUrl = poster
         this.plot = description
-        addEpisodes(DubStatus.Subbed, allEpisodes)
+        addEpisodes(DubStatus.Subbed, currentEpisode)
 
         // Adiciona recomendação para página principal
         if (animeUrl != null) {
