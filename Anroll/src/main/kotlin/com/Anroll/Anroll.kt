@@ -251,6 +251,7 @@ class Anroll : MainAPI() {
                 this.name = episodeName
                 this.episode = episode
                 this.description = episodePlot
+                this.posterUrl=episodePoster
             }
         ))
 
