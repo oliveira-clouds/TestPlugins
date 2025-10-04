@@ -289,7 +289,7 @@ class AnimesDigitalProvider : MainAPI() {
     return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
         this.posterUrl = poster
         this.plot = description
-        addEpisodes(DubStatus.Subbed, currentEpisode)
+        addEpisodes(DubStatus.Subbed, listOf(currentEpisode))
 
         // Adiciona recomendação para página principal
         if (animeUrl != null) {
