@@ -144,9 +144,16 @@ class Anroll : MainAPI() {
         } else {
             null
         }
-
+        val seriesCoverUrl = if (slugSerie.isNotEmpty()) {
+        "https://static.anroll.net/images/animes/capas/$slug.jpg"
+         } else {
+        null
+        }
+        val episodePoster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
+        
+        
         return newAnimeSearchResponse(title, url, TvType.Anime) {
-            this.posterUrl = posterUrl
+            this.posterUrl = posterUrl ?: episodePoster ?: seriesCoverUrl
             this.addDubStatus(isDub, episodeNumber)
         }
     }
