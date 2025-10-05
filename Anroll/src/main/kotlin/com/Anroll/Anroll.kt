@@ -153,9 +153,10 @@ class Anroll : MainAPI() {
     } else {
         null
     }
+    val finalPoster = screenshotUrl ?: seriesCoverUrl
     return newAnimeSearchResponse(title, url, TvType.Anime) {
         // Implementando o fallback: Tenta o screenshot, se falhar, usa a capa da série.
-        this.posterUrl = screenshotUrl ?: seriesCoverUrl 
+        this.posterUrl = finalPoster?.let{fixUrl(it)} 
         this.addDubStatus(isDub, episodeNumber)
     }
 }
@@ -260,7 +261,7 @@ class Anroll : MainAPI() {
     } else {
         "Episódio $episodeNumberText"
     }
-
+    val finalPosterUrl = episodePoster ?: posterUrl ?: seriesCoverUrl
     return newAnimeLoadResponse(title, url, TvType.Anime) {
         this.posterUrl = episodePoster ?: posterUrl ?: seriesCoverUrl
         this.plot = episodePlot
@@ -269,7 +270,7 @@ class Anroll : MainAPI() {
                 this.name = episodeName
                 this.episode = episode
                 this.description = episodePlot
-                this.posterUrl=episodePoster ?: posterUrl ?: seriesCoverUrl
+                this.posterUrl= finalPosterUrl?.let{fixUrl(it)}
             }
         ))
 
