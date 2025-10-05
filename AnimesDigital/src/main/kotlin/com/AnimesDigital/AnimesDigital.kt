@@ -669,7 +669,10 @@ private suspend fun extractBloggerVideo(bloggerUrl: String, realUrl: String, cal
                     
                     callback(
                         newExtractorLink(
-                            name, "Blogger $qualityName", videoUrl, ""
+                            name, 
+                            "Blogger $qualityName",
+                            videoUrl,
+                            ExtractorLinkType.VIDEO
                         ) {
                             this.referer = realUrl
                             this.quality = quality
