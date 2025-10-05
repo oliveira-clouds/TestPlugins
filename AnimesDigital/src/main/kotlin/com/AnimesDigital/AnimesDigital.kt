@@ -533,26 +533,25 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
     val document = app.get(realUrl).document
     val isMoviePage = realUrl.contains("/filme/", ignoreCase = true)
 
-    // Coletar todos os links primeiro
-    val allLinks = mutableListOf<ExtractorLink>()
+    var foundLinks = false
+    val otherLinks = mutableListOf<ExtractorLink>()
 
-    // Função para coletar links do loadExtractor - CORRIGIDO O TIPO
-    val collectingCallback = { link: ExtractorLink ->
-        allLinks.add(link)
-        Unit // Adiciona Unit para compatibilidade
+    // Callback temporário para coletar links dos outros players
+    val tempCallback = { link: ExtractorLink ->
+        otherLinks.add(link)
     }
 
     if (isMoviePage) {
         val iframes = document.select("iframe[src]")
         
-        // Processar FHD primeiro
+        // ETAPA 1: Processar APENAS players FHD primeiro e enviar IMEDIATAMENTE
         iframes.forEach { iframe ->
             val iframeSrc = iframe.attr("src") ?: return@forEach
             
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
                 m3u8Url?.let { url ->
-                    allLinks.add(
+                    callback(
                         newExtractorLink(
                             name, "Player FHD", url, ExtractorLinkType.M3U8
                         ) {
@@ -560,30 +559,31 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
                             this.quality = Qualities.Unknown.value
                         }
                     )
+                    foundLinks = true
                 }
             }
         }
         
-        // Processar outros players
+        // ETAPA 2: Processar outros players mas BLOQUEAR o callback real
         iframes.forEach { iframe ->
             val iframeSrc = iframe.attr("src") ?: return@forEach
             
             if (!iframeSrc.contains("anivideo.net") || !iframeSrc.contains("m3u8")) {
-                loadExtractor(iframeSrc, realUrl, subtitleCallback, collectingCallback)
+                loadExtractor(iframeSrc, realUrl, subtitleCallback, tempCallback)
             }
         }
     } else {
         // CÓDIGO PARA SÉRIES/EPISÓDIOS
         val playerElements = document.select(".tab-video iframe[src]")
         
-        // Processar players FHD primeiro
+        // ETAPA 1: Processar APENAS players FHD primeiro e enviar IMEDIATAMENTE
         playerElements.forEach { iframe ->
             val iframeSrc = iframe.attr("src") ?: return@forEach
             
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
                 m3u8Url?.let { url ->
-                    allLinks.add(
+                    callback(
                         newExtractorLink(
                             name, "Player FHD", url, ExtractorLinkType.M3U8
                         ) {
@@ -591,11 +591,12 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
                             this.quality = Qualities.Unknown.value
                         }
                     )
+                    foundLinks = true
                 }
             }
         }
         
-        // Processar outros players
+        // ETAPA 2: Processar outros players mas BLOQUEAR o callback real
         playerElements.forEach { iframe ->
             val iframeSrc = iframe.attr("src") ?: return@forEach
             
@@ -609,23 +610,24 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
                         val finalLink = targetIframe?.attr("src")
                         finalLink?.let { link ->
                             if (link.isNotBlank()) {
-                                loadExtractor(link, url, subtitleCallback, collectingCallback)
+                                loadExtractor(link, url, subtitleCallback, tempCallback)
                             }
                         }
                     }
                 } else {
-                    loadExtractor(iframeSrc, realUrl, subtitleCallback, collectingCallback)
+                    loadExtractor(iframeSrc, realUrl, subtitleCallback, tempCallback)
                 }
             }
         }
     }
     
-    // Agora enviar todos os links na ordem coletada (FHD já está primeiro)
-    allLinks.forEach { link ->
+    // ETAPA 3: Agora enviar todos os outros links coletados
+    otherLinks.forEach { link ->
         callback(link)
+        foundLinks = true
     }
     
-    return allLinks.isNotEmpty()
+    return foundLinks
 }
   
 
