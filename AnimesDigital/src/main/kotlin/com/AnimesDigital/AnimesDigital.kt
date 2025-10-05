@@ -520,14 +520,12 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
         return urlMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
     }
 
-   override suspend fun loadLinks(
+  override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    var foundLinks = false
-    
     val parts = data.split("|#|")
     val realUrl = parts[0]
     val episodeNum = parts.getOrNull(1)?.toIntOrNull() ?: 1
@@ -535,113 +533,96 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
     val document = app.get(realUrl).document
     val isMoviePage = realUrl.contains("/filme/", ignoreCase = true)
 
-    // CORREÇÃO PARA FILMES - tratamento simplificado
+    // Coletar todos os links primeiro
+    val allLinks = mutableListOf<ExtractorLink>()
+
+    // Função para coletar links do loadExtractor
+    val collectingCallback = { link: ExtractorLink ->
+        allLinks.add(link)
+    }
+
     if (isMoviePage) {
         val iframes = document.select("iframe[src]")
         
-        // Separar players FHD dos demais
-        val fhdPlayers = mutableListOf<Element>()
-        val otherPlayers = mutableListOf<Element>()
-        
+        // Processar FHD primeiro
         iframes.forEach { iframe ->
             val iframeSrc = iframe.attr("src") ?: return@forEach
             
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
-                fhdPlayers.add(iframe)
-            } else {
-                otherPlayers.add(iframe)
-            }
-        }
-        
-        // Processar FHD primeiro
-        fhdPlayers.forEach { iframe ->
-            val iframeSrc = iframe.attr("src")
-            val m3u8Url = extractM3u8Url(iframeSrc)
-            m3u8Url?.let { url ->
-                callback.invoke(
-                    newExtractorLink(
-                        name, "Player FHD", url, ExtractorLinkType.M3U8
-                    ) {
-                        this.referer = realUrl 
-                        this.quality = Qualities.Unknown.value
-                    }
-                )
-                foundLinks = true
-            }
-        }
-        
-        // Processar outros players depois
-        otherPlayers.forEach { iframe ->
-            val iframeSrc = iframe.attr("src")
-            loadExtractor(iframeSrc, realUrl, subtitleCallback, callback)
-            foundLinks = true
-        }
-        
-        return foundLinks
-    }
-
-    // CÓDIGO PARA SÉRIES/EPISÓDIOS - COM ORDENAÇÃO
-    val playerElements = document.select(".tab-video iframe[src]")
-    
-    // Separar players FHD dos demais
-    val fhdPlayers = mutableListOf<Element>()
-    val otherPlayers = mutableListOf<Element>()
-    
-    playerElements.forEach { iframe ->
-        val iframeSrc = iframe.attr("src") ?: return@forEach
-        
-        if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
-            fhdPlayers.add(iframe)
-        } else {
-            otherPlayers.add(iframe)
-        }
-    }
-    
-    // Processar players FHD primeiro
-    fhdPlayers.forEach { iframe ->
-        val iframeSrc = iframe.attr("src")
-        val m3u8Url = extractM3u8Url(iframeSrc)
-        m3u8Url?.let { url ->
-            callback.invoke(
-                newExtractorLink(
-                    name, "Player FHD", url, ExtractorLinkType.M3U8
-                ) {
-                    this.referer = realUrl 
-                    this.quality = Qualities.Unknown.value
+                val m3u8Url = extractM3u8Url(iframeSrc)
+                m3u8Url?.let { url ->
+                    allLinks.add(
+                        newExtractorLink(
+                            name, "Player FHD", url, ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = realUrl 
+                            this.quality = Qualities.Unknown.value
+                        }
+                    )
                 }
-            )
-            foundLinks = true
+            }
         }
-    }
-    
-    // Processar outros players depois
-    otherPlayers.forEach { iframe ->
-        val iframeSrc = iframe.attr("src")
         
-        if (iframeSrc.contains("animesdigital.org/aHR0")) {
-            val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
+        // Processar outros players
+        iframes.forEach { iframe ->
+            val iframeSrc = iframe.attr("src") ?: return@forEach
             
-            decodedPageUrl?.let { url ->
-                val playerPage = app.get(url).document
-                val allIframes = playerPage.select(".post-body iframe[src]")
-                val targetIframe = allIframes.getOrNull(episodeNum - 1)
-                
-                val finalLink = targetIframe?.attr("src")
-                
-                finalLink?.let { link ->
-                    if (link.isNotBlank()) {
-                        loadExtractor(link, url, subtitleCallback, callback)
-                        foundLinks = true
-                    }
+            if (!iframeSrc.contains("anivideo.net") || !iframeSrc.contains("m3u8")) {
+                loadExtractor(iframeSrc, realUrl, subtitleCallback, collectingCallback)
+            }
+        }
+    } else {
+        // CÓDIGO PARA SÉRIES/EPISÓDIOS
+        val playerElements = document.select(".tab-video iframe[src]")
+        
+        // Processar players FHD primeiro
+        playerElements.forEach { iframe ->
+            val iframeSrc = iframe.attr("src") ?: return@forEach
+            
+            if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
+                val m3u8Url = extractM3u8Url(iframeSrc)
+                m3u8Url?.let { url ->
+                    allLinks.add(
+                        newExtractorLink(
+                            name, "Player FHD", url, ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = realUrl 
+                            this.quality = Qualities.Unknown.value
+                        }
+                    )
                 }
             }
-        } else {
-            loadExtractor(iframeSrc, realUrl, subtitleCallback, callback)
-            foundLinks = true
+        }
+        
+        // Processar outros players
+        playerElements.forEach { iframe ->
+            val iframeSrc = iframe.attr("src") ?: return@forEach
+            
+            if (!iframeSrc.contains("anivideo.net") || !iframeSrc.contains("m3u8")) {
+                if (iframeSrc.contains("animesdigital.org/aHR0")) {
+                    val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
+                    decodedPageUrl?.let { url ->
+                        val playerPage = app.get(url).document
+                        val allIframes = playerPage.select(".post-body iframe[src]")
+                        val targetIframe = allIframes.getOrNull(episodeNum - 1)
+                        val finalLink = targetIframe?.attr("src")
+                        finalLink?.let { link ->
+                            if (link.isNotBlank()) {
+                                loadExtractor(link, url, subtitleCallback, collectingCallback)
+                            }
+                        }
+                    }
+                } else {
+                    loadExtractor(iframeSrc, realUrl, subtitleCallback, collectingCallback)
+                }
+            }
         }
     }
+    allLinks.forEach { link ->
+        callback(link)
+    }
     
-    return foundLinks
+    return allLinks.isNotEmpty()
 }
 
     private fun extractM3u8Url(iframeSrc: String): String? {
