@@ -270,7 +270,7 @@ class Anroll : MainAPI() {
                 this.name = episodeName
                 this.episode = episode
                 this.description = episodePlot
-                this.posterUrl= fixUrl(finalPosterUrl)
+                this.posterUrl= finalPosterUrl?.let {fixUrl(it)}
             }
         ))
 
@@ -278,7 +278,7 @@ class Anroll : MainAPI() {
         if (animeUrl != null) {
             this.recommendations = listOf(
                 newAnimeSearchResponse("Ver todos os episódios", fixUrl(animeUrl), TvType.Anime) {
-                    this.posterUrl = fixUrl(episodePoster)
+                    this.posterUrl = episodePoster?.let {fixUrl(it)}
                 }
             )
         }
