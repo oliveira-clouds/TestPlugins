@@ -536,9 +536,9 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
     var foundLinks = false
     val otherLinks = mutableListOf<ExtractorLink>()
 
-    // Callback temporário para coletar links dos outros players
     val tempCallback = { link: ExtractorLink ->
         otherLinks.add(link)
+        Unit
     }
 
     if (isMoviePage) {
@@ -600,24 +600,28 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
         playerElements.forEach { iframe ->
             val iframeSrc = iframe.attr("src") ?: return@forEach
             
-            if (!iframeSrc.contains("anivideo.net") || !iframeSrc.contains("m3u8")) {
-                if (iframeSrc.contains("animesdigital.org/aHR0")) {
-                    val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
-                    decodedPageUrl?.let { url ->
-                        val playerPage = app.get(url).document
-                        val allIframes = playerPage.select(".post-body iframe[src]")
-                        val targetIframe = allIframes.getOrNull(episodeNum - 1)
-                        val finalLink = targetIframe?.attr("src")
-                        finalLink?.let { link ->
-                            if (link.isNotBlank()) {
-                                loadExtractor(link, url, subtitleCallback, tempCallback)
-                            }
-                        }
-                    }
+            if (iframeSrc.contains("animesdigital.org/aHR0")) {
+    val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
+    decodedPageUrl?.let { url ->
+        val playerPage = app.get(url).document
+        val allIframes = playerPage.select(".post-body iframe[src]")
+        val targetIframe = allIframes.getOrNull(episodeNum - 1)
+        val finalLink = targetIframe?.attr("src")
+        finalLink?.let { link ->
+            if (link.isNotBlank()) {
+                if (link.contains("blogger.com")) {
+                    extractBloggerVideo(link, url, tempCallback)
                 } else {
-                    loadExtractor(iframeSrc, realUrl, subtitleCallback, tempCallback)
+                    loadExtractor(link, url, subtitleCallback, tempCallback)
                 }
             }
+        }
+    }
+} else if (iframeSrc.contains("blogger.com")) {
+    extractBloggerVideo(iframeSrc, realUrl, tempCallback)
+} else {
+    loadExtractor(iframeSrc, realUrl, subtitleCallback, tempCallback)
+}
         }
     }
     
@@ -630,7 +634,60 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
     return foundLinks
 }
   
-
+private suspend fun extractBloggerVideo(bloggerUrl: String, realUrl: String, callback: (ExtractorLink) -> Unit) {
+    try {
+        val response = app.get(bloggerUrl)
+        val document = response.document
+        
+        // Procura pelo script que contém VIDEO_CONFIG
+        val script = document.select("script:containsData(VIDEO_CONFIG)").firstOrNull()
+        if (script != null) {
+            val scriptContent = script.html()
+            
+            // Extrai o JSON do VIDEO_CONFIG
+            val jsonMatch = Regex("""VIDEO_CONFIG\s*=\s*(\{.*?\})""").find(scriptContent)
+            if (jsonMatch != null) {
+                val jsonString = jsonMatch.groupValues[1]
+                val jsonObject = JSONObject(jsonString)
+                
+                // Extrai os streams
+                val streamsArray = jsonObject.getJSONArray("streams")
+                
+                for (i in 0 until streamsArray.length()) {
+                    val stream = streamsArray.getJSONObject(i)
+                    val videoUrl = stream.getString("play_url")
+                    val formatId = stream.getInt("format_id")
+                    
+                    // Mapeia format_id para qualidade
+                    val (quality, qualityName) = when (formatId) {
+                        22 -> Qualities.P720.value to "720p"  // HD
+                        18 -> Qualities.P360.value to "360p"  // SD
+                        37 -> Qualities.P1080.value to "1080p" // Full HD
+                        59 -> Qualities.P480.value to "480p"   // 480p
+                        else -> Qualities.Unknown.value to "Auto"
+                    }
+                    
+                    callback(
+                        newExtractorLink(
+                            name, "Blogger $qualityName", videoUrl, ""
+                        ) {
+                            this.referer = realUrl
+                            this.quality = quality
+                        }
+                    )
+                }
+                return
+            }
+        }
+        
+        // Fallback se não encontrar VIDEO_CONFIG
+        loadExtractor(bloggerUrl, realUrl, {}, callback)
+        
+    } catch (e: Exception) {
+        // Fallback em caso de erro
+        loadExtractor(bloggerUrl, realUrl, {}, callback)
+    }
+}
     private fun extractM3u8Url(iframeSrc: String): String? {
         return try {
             val params = iframeSrc.split("?").last().split("&")
