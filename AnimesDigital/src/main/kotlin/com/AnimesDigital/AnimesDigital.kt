@@ -194,12 +194,10 @@ class AnimesDigitalProvider : MainAPI() {
     
     return if (title.isNotEmpty() && href.isNotEmpty()) {
         if (isMovie) {
-            // Usa newMovieSearchResponse para filmes
             newMovieSearchResponse(title, href, TvType.Movie) {
                 this.posterUrl = fixUrlNull(posterUrl)
             }
         } else {
-            // Usa newAnimeSearchResponse para animes
             newAnimeSearchResponse(title, href, TvType.Anime) {
                 this.posterUrl = fixUrlNull(posterUrl)
             }
@@ -268,22 +266,17 @@ class AnimesDigitalProvider : MainAPI() {
     val title = document.selectFirst("meta[property=og:title]")?.attr("content") ?: return null
     val poster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
     val description = document.selectFirst("meta[property=og:description]")?.attr("content")
-    
-    // Extrai informações do anime
     val animeTitle = document.selectFirst(".info span:contains(Anime) + span")?.text() 
         ?: document.selectFirst("#anime_title")?.text()?.replace(" Episódio \\d+".toRegex(), "")?.trim()
         ?: title
     
-    // Extrai número do episódio atual
     val currentEpisodeNumber = extractCurrentEpisodeNumber(url, title)
     val urlWithIndex = "$url|#|$currentEpisodeNumber"
-    // Cria o episódio atual
     val currentEpisode = newEpisode(urlWithIndex) {
         this.name = "Episódio $currentEpisodeNumber"
         this.episode = currentEpisodeNumber
     }
     
-    // EXTRAI O LINK DA PÁGINA PRINCIPAL DO ANIME DE VÁRIAS FORMAS
     val animeUrl = extractAnimeMainPageUrl(document, url)
 
     return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
@@ -304,21 +297,17 @@ class AnimesDigitalProvider : MainAPI() {
 
 // Função auxiliar para extrair URL da página principal
 private fun extractAnimeMainPageUrl(document: org.jsoup.nodes.Document, currentUrl: String): String? {
-    // Tenta de várias formas:
     
-    // 1. Do elemento .epsL (seção de navegação)
     val epslLink = document.selectFirst(".epsL a[href]")?.attr("href")
     if (epslLink != null && epslLink.contains("/anime/a/")) {
         return epslLink
     }
     
-    // 2. De qualquer link que contenha "/anime/a/"
     val animeLink = document.selectFirst("a[href*='/anime/a/']")?.attr("href")
     if (animeLink != null) {
         return animeLink
     }
     
-    // 3. Tenta construir a URL a partir da URL atual
     val animeSlug = extractAnimeSlugFromUrl(currentUrl)
     if (animeSlug != null) {
         return "https://animesdigital.org/anime/a/$animeSlug"
@@ -327,7 +316,6 @@ private fun extractAnimeMainPageUrl(document: org.jsoup.nodes.Document, currentU
     return null
 }
 
-// Função para extrair slug do anime da URL
 private fun extractAnimeSlugFromUrl(url: String): String? {
     val match = Regex("""/video/a/([^/]+)/""").find(url)
     return match?.groupValues?.get(1)
@@ -356,7 +344,6 @@ private fun extractCurrentEpisodeNumber(url: String, title: String): Int {
    private suspend fun loadAnime(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
     val infoContainer = document.selectFirst(".single_anime, .single-content, .dados") ?: document
 
-    // Título - agora pega do .dados h1
     val title = infoContainer.selectFirst(".dados h1, h1.single-title, h1")?.text()?.trim() 
         ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.let { content ->
             if (content.contains(" - Animes Online")) {
@@ -367,21 +354,14 @@ private fun extractCurrentEpisodeNumber(url: String, title: String): Int {
         }
         ?: document.selectFirst("h1, h2")?.text() ?: return null
 
-    // Poster
     val poster = infoContainer.selectFirst(".foto img")?.attr("src") 
         ?: document.selectFirst("img[src*=/uploads/]")?.attr("src") 
         ?: document.selectFirst("meta[property=og:image]")?.attr("content")
     val posterUrl = fixUrlNull(poster)
-    
-    // Descrição - agora pega do .dados .sinopse
     val description = infoContainer.selectFirst(".dados .sinopse, .sinopse p")?.text()?.trim() 
         ?: document.selectFirst("meta[property=og:description]")?.attr("content")
-
-    // Tags/Gêneros - agora pega do .dados .genres
     val tags = infoContainer.select(".dados .genres a, .generos a, .single-meta a[href*='genero']")
         .map { it.text().trim() }
-
-    // Ano - extrai do .dados .info
     val year = infoContainer.selectFirst(".dados .info:contains(Ano)")?.text()?.replace("Ano", "")?.trim()?.toIntOrNull()
     
     val statusText = infoContainer.selectFirst(".status span")?.text()?.trim()
@@ -403,7 +383,6 @@ private fun extractCurrentEpisodeNumber(url: String, title: String): Int {
         }
     }
 
-    // Carrega todos os episódios
     val allEpisodes = loadAllEpisodes(url, document)
 
     return newAnimeLoadResponse(title, url, tvType) {
@@ -520,12 +499,14 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
         return urlMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
     }
 
-    override suspend fun loadLinks(
+   override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
+    var foundLinks = false
+    
     val parts = data.split("|#|")
     val realUrl = parts[0]
     val episodeNum = parts.getOrNull(1)?.toIntOrNull() ?: 1
@@ -533,25 +514,15 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
     val document = app.get(realUrl).document
     val isMoviePage = realUrl.contains("/filme/", ignoreCase = true)
 
-    var foundLinks = false
-    val otherLinks = mutableListOf<ExtractorLink>()
-
-    val tempCallback = { link: ExtractorLink ->
-        otherLinks.add(link)
-        Unit
-    }
-
     if (isMoviePage) {
         val iframes = document.select("iframe[src]")
-        
-        // ETAPA 1: Processar APENAS players FHD primeiro e enviar IMEDIATAMENTE
         iframes.forEach { iframe ->
             val iframeSrc = iframe.attr("src") ?: return@forEach
             
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
                 m3u8Url?.let { url ->
-                    callback(
+                    callback.invoke(
                         newExtractorLink(
                             name, "Player FHD", url, ExtractorLinkType.M3U8
                         ) {
@@ -561,136 +532,55 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
                     )
                     foundLinks = true
                 }
+            } else {
+                loadExtractor(iframeSrc, realUrl, subtitleCallback, callback)
+                foundLinks = true
             }
         }
-        
-        // ETAPA 2: Processar outros players mas BLOQUEAR o callback real
-        iframes.forEach { iframe ->
-            val iframeSrc = iframe.attr("src") ?: return@forEach
-            
-            if (!iframeSrc.contains("anivideo.net") || !iframeSrc.contains("m3u8")) {
-                loadExtractor(iframeSrc, realUrl, subtitleCallback, tempCallback)
-            }
-        }
-    } else {
-        // CÓDIGO PARA SÉRIES/EPISÓDIOS
-        val playerElements = document.select(".tab-video iframe[src]")
-        
-        // ETAPA 1: Processar APENAS players FHD primeiro e enviar IMEDIATAMENTE
-        playerElements.forEach { iframe ->
-            val iframeSrc = iframe.attr("src") ?: return@forEach
-            
-            if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
-                val m3u8Url = extractM3u8Url(iframeSrc)
-                m3u8Url?.let { url ->
-                    callback(
-                        newExtractorLink(
-                            name, "Player FHD", url, ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = realUrl 
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
-                    foundLinks = true
-                }
-            }
-        }
-        
-        // ETAPA 2: Processar outros players mas BLOQUEAR o callback real
-        playerElements.forEach { iframe ->
-            val iframeSrc = iframe.attr("src") ?: return@forEach
-            
-            if (iframeSrc.contains("animesdigital.org/aHR0")) {
-    val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
-    decodedPageUrl?.let { url ->
-        val playerPage = app.get(url).document
-        val allIframes = playerPage.select(".post-body iframe[src]")
-        val targetIframe = allIframes.getOrNull(episodeNum - 1)
-        val finalLink = targetIframe?.attr("src")
-        finalLink?.let { link ->
-            if (link.isNotBlank()) {
-                if (link.contains("blogger.com")) {
-                    extractBloggerVideo(link, url, tempCallback)
-                } else {
-                    loadExtractor(link, url, subtitleCallback, tempCallback)
-                }
-            }
-        }
+        return foundLinks
     }
-} else if (iframeSrc.contains("blogger.com")) {
-    extractBloggerVideo(iframeSrc, realUrl, tempCallback)
-} else {
-    loadExtractor(iframeSrc, realUrl, subtitleCallback, tempCallback)
-}
-        }
-    }
+    val playerElements = document.select(".tab-video iframe[src]")
     
-    // ETAPA 3: Agora enviar todos os outros links coletados
-    otherLinks.forEach { link ->
-        callback(link)
-        foundLinks = true
+    playerElements.forEach { iframe ->
+        val iframeSrc = iframe.attr("src") ?: return@forEach
+        
+        if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
+            val m3u8Url = extractM3u8Url(iframeSrc)
+            m3u8Url?.let { url ->
+                callback.invoke(
+                    newExtractorLink(
+                        name, "Player FHD", url, ExtractorLinkType.M3U8
+                    ) {
+                        this.referer = realUrl 
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+                foundLinks = true
+            }
+        }
+        else if (iframeSrc.contains("animesdigital.org/aHR0")) {
+            val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
+            
+            decodedPageUrl?.let { url ->
+                val playerPage = app.get(url).document
+                val allIframes = playerPage.select(".post-body iframe[src]")
+                val targetIframe = allIframes.getOrNull(episodeNum - 1)
+                
+                val finalLink = targetIframe?.attr("src")
+                
+                finalLink?.let { link ->
+                    if (link.isNotBlank()) {
+                        loadExtractor(link, url, subtitleCallback, callback)
+                        foundLinks = true
+                    }
+                }
+            }
+        }
     }
     
     return foundLinks
 }
-  
-private suspend fun extractBloggerVideo(bloggerUrl: String, realUrl: String, callback: (ExtractorLink) -> Unit) {
-    try {
-        val response = app.get(bloggerUrl)
-        val document = response.document
-        
-        // Procura pelo script que contém VIDEO_CONFIG
-        val script = document.select("script:containsData(VIDEO_CONFIG)").firstOrNull()
-        if (script != null) {
-            val scriptContent = script.html()
-            
-            // Extrai o JSON do VIDEO_CONFIG
-            val jsonMatch = Regex("""VIDEO_CONFIG\s*=\s*(\{.*?\})""").find(scriptContent)
-            if (jsonMatch != null) {
-                val jsonString = jsonMatch.groupValues[1]
-                val jsonObject = JSONObject(jsonString)
-                
-                // Extrai os streams
-                val streamsArray = jsonObject.getJSONArray("streams")
-                
-                for (i in 0 until streamsArray.length()) {
-                    val stream = streamsArray.getJSONObject(i)
-                    val videoUrl = stream.getString("play_url")
-                    val formatId = stream.getInt("format_id")
-                    
-                    // Mapeia format_id para qualidade
-                    val (quality, qualityName) = when (formatId) {
-                        22 -> Qualities.P720.value to "720p"  // HD
-                        18 -> Qualities.P360.value to "360p"  // SD
-                        37 -> Qualities.P1080.value to "1080p" // Full HD
-                        59 -> Qualities.P480.value to "480p"   // 480p
-                        else -> Qualities.Unknown.value to "Auto"
-                    }
-                    
-                    callback(
-                        newExtractorLink(
-                            name, 
-                            "Blogger $qualityName",
-                            videoUrl,
-                            ExtractorLinkType.VIDEO
-                        ) {
-                            this.referer = realUrl
-                            this.quality = quality
-                        }
-                    )
-                }
-                return
-            }
-        }
-        
-        // Fallback se não encontrar VIDEO_CONFIG
-        loadExtractor(bloggerUrl, realUrl, {}, callback)
-        
-    } catch (e: Exception) {
-        // Fallback em caso de erro
-        loadExtractor(bloggerUrl, realUrl, {}, callback)
-    }
-}
+
     private fun extractM3u8Url(iframeSrc: String): String? {
         return try {
             val params = iframeSrc.split("?").last().split("&")
