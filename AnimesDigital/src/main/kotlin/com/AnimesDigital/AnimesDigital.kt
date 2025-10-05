@@ -520,7 +520,7 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
         return urlMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
     }
 
-  override suspend fun loadLinks(
+    override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
@@ -536,9 +536,10 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
     // Coletar todos os links primeiro
     val allLinks = mutableListOf<ExtractorLink>()
 
-    // Função para coletar links do loadExtractor
+    // Função para coletar links do loadExtractor - CORRIGIDO O TIPO
     val collectingCallback = { link: ExtractorLink ->
         allLinks.add(link)
+        Unit // Adiciona Unit para compatibilidade
     }
 
     if (isMoviePage) {
@@ -618,12 +619,15 @@ private fun extractEpisodesFromPage(document: org.jsoup.nodes.Document): List<Ep
             }
         }
     }
+    
+    // Agora enviar todos os links na ordem coletada (FHD já está primeiro)
     allLinks.forEach { link ->
         callback(link)
     }
     
     return allLinks.isNotEmpty()
 }
+  
 
     private fun extractM3u8Url(iframeSrc: String): String? {
         return try {
