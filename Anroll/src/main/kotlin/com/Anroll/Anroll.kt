@@ -264,7 +264,7 @@ class Anroll : MainAPI() {
     }
     val titulo= "$title - Episódio $episodeNumberText"
     val finalPosterUrl = episodePoster ?: posterUrl ?: seriesCoverUrl
-    return newAnimeLoadResponse(title, url, TvType.Anime) {
+    return newAnimeLoadResponse(titulo, url, TvType.Anime) {
         this.posterUrl = episodePoster ?: posterUrl ?: seriesCoverUrl
         this.plot = episodePlot
         addEpisodes(DubStatus.Subbed, listOf(
