@@ -1,0 +1,66 @@
+[
+    {
+        "iconUrl": "https://animesdigital.org/wp-content/uploads/2025/03/cropped-logo-e1740827992823-192x192.png",
+        "jarFileSize": 102226,
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/oliveira-clouds/TestPlugins",
+        "fileSize": 27156,
+        "status": 1,
+        "language": "pt-br",
+        "authors": [
+            "Sephiroth"
+        ],
+        "tvTypes": [
+            "Anime"
+        ],
+        "version": 1,
+        "internalName": "AnimesDigital",
+        "jarUrl": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/AnimesDigital.jar",
+        "description": "Animes Digital - Animes Legendados, dublados, filmes e desenhos ",
+        "url": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/AnimesDigital.cs3",
+        "name": "AnimesDigital"
+    },
+    {
+        "iconUrl": "https://www.anroll.net/_next/image?url=https%3A%2F%2Fstatic.anroll.net%2Fapp-images%2Ffavicon.ico&w=32&q=75",
+        "jarFileSize": 72659,
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/oliveira-clouds/TestPlugins",
+        "fileSize": 20453,
+        "status": 1,
+        "language": "pt-br",
+        "authors": [
+            "Sephiroth"
+        ],
+        "tvTypes": [
+            "Anime"
+        ],
+        "version": 1,
+        "internalName": "Anroll",
+        "jarUrl": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/Anroll.jar",
+        "description": "Anroll - Animes Legendados e Dublados",
+        "url": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/Anroll.cs3",
+        "name": "Anroll"
+    },
+    {
+        "iconUrl": "https://doramasonline.org/wp-content/uploads/2022/04/pngegg.png",
+        "jarFileSize": 63756,
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/oliveira-clouds/TestPlugins",
+        "fileSize": 17554,
+        "status": 1,
+        "language": "pt-br",
+        "authors": [
+            "Sephiroth"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "DoramasOnline",
+        "jarUrl": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/DoramasOnline.jar",
+        "description": "Doramas Online - Filmes e S\u00e9ries Legendados e Dublados",
+        "url": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/DoramasOnline.cs3",
+        "name": "DoramasOnline"
+    }
+]
