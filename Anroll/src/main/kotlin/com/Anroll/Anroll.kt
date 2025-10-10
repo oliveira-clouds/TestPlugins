@@ -19,7 +19,7 @@ class Anroll : MainAPI() {
     override var lang = "pt-br"
     override val hasDownloadSupport = false
     override val hasQuickSearch = true
-    override val supportedTypes = setOf(TvType.TvSeries, TvType.Anime, TvType.Movie)
+    override val supportedTypes = setOf(TvType.Anime, TvType.AnimeMovie)
     
          override val mainPage = mainPageOf(
         "lancamentos" to "Últimos Lançamentos",
