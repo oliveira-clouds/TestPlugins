@@ -1,0 +1,72 @@
+[
+    {
+        "iconUrl": "https://animesdigital.org/wp-content/uploads/2025/03/cropped-logo-e1740827992823-192x192.png",
+        "jarFileSize": 108123,
+        "fileHash": "sha256-d1de15aefc3479a213005ddd14329aa90e3a4ad27916dd056d2663390f1ff94b",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/oliveira-clouds/TestPlugins",
+        "fileSize": 28563,
+        "status": 1,
+        "language": "pt-br",
+        "authors": [
+            "Sephiroth"
+        ],
+        "tvTypes": [
+            "Anime"
+        ],
+        "version": 1,
+        "internalName": "AnimesDigital",
+        "jarUrl": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/AnimesDigital.jar",
+        "description": "Animes Digital - Animes Legendados, dublados, filmes e desenhos ",
+        "url": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/AnimesDigital.cs3",
+        "name": "AnimesDigital",
+        "jarHash": "sha256-c983d40e9b4c6c7c6280d281191d00a20ca9717d915493a5bb0f0fcc8ed443c6"
+    },
+    {
+        "iconUrl": "https://www.anroll.net/_next/image?url=https%3A%2F%2Fstatic.anroll.net%2Fapp-images%2Ffavicon.ico&w=32&q=75",
+        "jarFileSize": 72659,
+        "fileHash": "sha256-0983c1700b50db23504c8b6a6054d5f7a42daed74cce0be1dedf010b5d4899d5",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/oliveira-clouds/TestPlugins",
+        "fileSize": 20453,
+        "status": 1,
+        "language": "pt-br",
+        "authors": [
+            "Sephiroth"
+        ],
+        "tvTypes": [
+            "Anime"
+        ],
+        "version": 1,
+        "internalName": "Anroll",
+        "jarUrl": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/Anroll.jar",
+        "description": "Anroll - Animes Legendados e Dublados",
+        "url": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/Anroll.cs3",
+        "name": "Anroll",
+        "jarHash": "sha256-d1a80809dc0710ef8a90c0e4562ce67369ae2459c5279710456017a9cd99c0af"
+    },
+    {
+        "iconUrl": "https://doramasonline.org/wp-content/uploads/2022/04/pngegg.png",
+        "jarFileSize": 63756,
+        "fileHash": "sha256-7cd2dc555c9eb92b25759a43db3ca7138efd81bce597ed9bc380c34463413922",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/oliveira-clouds/TestPlugins",
+        "fileSize": 17554,
+        "status": 1,
+        "language": "pt-br",
+        "authors": [
+            "Sephiroth"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "DoramasOnline",
+        "jarUrl": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/DoramasOnline.jar",
+        "description": "Doramas Online - Filmes e S\u00e9ries Legendados e Dublados",
+        "url": "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/builds/DoramasOnline.cs3",
+        "name": "DoramasOnline",
+        "jarHash": "sha256-b2f969d7f05f01f92c9f2cbdc79207c9c71e2f8d6f26b5c0bde7968d0ebd5681"
+    }
+]

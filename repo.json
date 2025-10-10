@@ -1,0 +1,8 @@
+{
+  "name": "Sephiroth",
+  "description": "Sephiroth br repository",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://raw.githubusercontent.com/oliveira-clouds/TestPlugins/refs/heads/builds/plugins.json"
+  ]
+}
