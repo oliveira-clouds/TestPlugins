@@ -34,7 +34,7 @@ class AnimesDigitalProvider : MainAPI() {
                     list = HomePageList(
                         name = request.name,
                         list = home,
-                        isHorizontalImages = false
+                        isHorizontalImages = true
                     ),
                     hasNext = false
                 )
@@ -177,7 +177,7 @@ class AnimesDigitalProvider : MainAPI() {
             list = HomePageList(
                 name = request.name,
                 list = home,
-                isHorizontalImages = request.data.contains("home")
+                isHorizontalImages = false
             ),
             hasNext = hasNext
         )
