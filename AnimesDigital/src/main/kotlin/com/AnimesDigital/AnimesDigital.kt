@@ -301,7 +301,7 @@ class AnimesDigitalProvider : MainAPI() {
         allEps.addAll(sidebarEpisodes)
         
         // Ordena de forma decrescente e remove duplicatas pelo número
-        finalEpisodes = allEps.distinctBy { it.episode }.sortedByDescending { it.episode }
+        finalEpisodes = allEps.distinctBy { it.episode }
     } else {
         // Fallback: Se não achou a sidebar, usa o método antigo de episódio único
         val urlWithIndex = "$url|#|$currentEpisodeNumber"
