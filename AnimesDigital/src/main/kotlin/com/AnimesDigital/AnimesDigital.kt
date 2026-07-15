@@ -4,6 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.DubStatus
 import org.jsoup.nodes.Element
+import org.jsoup.nodes.Document
 import org.json.JSONObject
 import java.util.Base64
 
@@ -271,9 +272,9 @@ class AnimesDigitalProvider : MainAPI() {
         ?: title
     
     val currentEpisodeNumber = extractCurrentEpisodeNumber(url, title)
-
-    // Tenta extrair os episódios direto da sidebar lateral da página do episódio
-    val episodes = document.select(".sidebar_navigation_episodes a.episode_list_episodes_item").mapNotNull { epElement ->
+    
+    // ===== INÍCIO DA MELHORIA: Carregar lista da sidebar =====
+    val sidebarEpisodes = document.select(".sidebar_navigation_episodes a.episode_list_episodes_item").mapNotNull { epElement ->
         val epUrl = epElement.attr("href").takeIf { it.isNotBlank() }?.let { fixUrl(it) } ?: return@mapNotNull null
         val epNumStr = epElement.selectFirst(".episode_list_episodes_num")?.text()?.trim() ?: return@mapNotNull null
         val epNum = epNumStr.toIntOrNull() ?: return@mapNotNull null
@@ -285,24 +286,36 @@ class AnimesDigitalProvider : MainAPI() {
         }
     }
 
-    // Fallback: Se não achou a sidebar, usa o método antigo de episódio único
-    val finalEpisodes = if (episodes.isNotEmpty()) {
-        episodes
+    val finalEpisodes: List<Episode>
+    val animeUrl = extractAnimeMainPageUrl(document, url)
+
+    if (sidebarEpisodes.isNotEmpty()) {
+        // Adiciona o episódio atual à lista da sidebar (que começa no atual - 1)
+        val currentEp = newEpisode("$url|#|$currentEpisodeNumber") {
+            this.name = "Episódio $currentEpisodeNumber"
+            this.episode = currentEpisodeNumber
+        }
+        
+        val allEps = mutableListOf<Episode>()
+        allEps.add(currentEp)
+        allEps.addAll(sidebarEpisodes)
+        
+        // Ordena de forma decrescente e remove duplicatas pelo número
+        finalEpisodes = allEps.distinctBy { it.episode }.sortedByDescending { it.episode }
     } else {
+        // Fallback: Se não achou a sidebar, usa o método antigo de episódio único
         val urlWithIndex = "$url|#|$currentEpisodeNumber"
-        listOf(newEpisode(urlWithIndex) {
+        finalEpisodes = listOf(newEpisode(urlWithIndex) {
             this.name = "Episódio $currentEpisodeNumber"
             this.episode = currentEpisodeNumber
         })
     }
-
-    
-    val animeUrl = extractAnimeMainPageUrl(document, url)
+    // ===== FIM DA MELHORIA =====
 
     return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
         this.posterUrl = poster
         this.plot = description
-        addEpisodes(DubStatus.Subbed, finalEpisodes) // Usa a lista completa aqui
+        addEpisodes(DubStatus.Subbed, finalEpisodes)
 
         // Adiciona recomendação para página principal
         if (animeUrl != null) {
