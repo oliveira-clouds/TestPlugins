@@ -3,6 +3,7 @@ package com.AnimesDigital
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.DubStatus
+import com.lagradost.cloudstream3.app
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Document
 import org.json.JSONObject
@@ -26,7 +27,6 @@ class AnimesDigitalProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         return when {
-            // "lancamentos" usa scraping, o resto usa API
             request.data.contains("lancamentos") -> {
                 val document = app.get(request.data).document
                 val home = document.select(".itemE, .itemA").mapNotNull { it.toSearchResult() }
@@ -113,7 +113,7 @@ class AnimesDigitalProvider : MainAPI() {
                 val searchResult = document.selectFirst(".itemA")?.toSearchResultAlternative() 
                 if (searchResult != null) results.add(searchResult)
             }
-        } catch (e: Exception) { logError("API parse error", e) }
+        } catch (e: Exception) { }
         return results
     }
 
@@ -197,7 +197,6 @@ class AnimesDigitalProvider : MainAPI() {
         val description = infoContainer.selectFirst(".info:contains(Descrição) span:last-child")?.text()?.trim()
         val year = infoContainer.selectFirst(".info:contains(Data) span:last-child")?.text()?.trim()?.takeLast(4)?.toIntOrNull()
 
-        // Passa a URL do filme como data
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
             this.posterUrl = poster
             this.plot = description
@@ -211,7 +210,6 @@ class AnimesDigitalProvider : MainAPI() {
         val animeTitle = document.selectFirst(".descep_video .info:contains(Anime) span:last-child")?.text()?.trim() ?: title
         val dubStatus = getDubStatusFromDoc(document)
 
-        // Tenta carregar a lista da sidebar na página do episódio
         val episodes = document.select(".sidebar_navigation_episodes a.episode_list_episodes_item").mapNotNull { epElement ->
             val epUrl = epElement.attr("href").takeIf { it.isNotBlank() }?.let { fixUrl(it) } ?: return@mapNotNull null
             val epNumStr = epElement.selectFirst(".episode_list_episodes_num")?.text()?.trim() ?: return@mapNotNull null
@@ -224,7 +222,6 @@ class AnimesDigitalProvider : MainAPI() {
             }
         }
 
-        // Fallback: Se não achou a sidebar, retorna apenas o episódio atual
         val finalEpisodes = if (episodes.isNotEmpty()) episodes else {
             val currentEpNumStr = document.selectFirst(".descep_video .info:contains(Episódio) span:last-child")?.text()?.trim()
                 ?: extractCurrentEpisodeNumber(title).toString()
@@ -334,10 +331,10 @@ class AnimesDigitalProvider : MainAPI() {
             val match = pattern.find(title)
             if (match != null) {
                 val numFloat = match.groupValues[1].toFloatOrNull() ?: continue
-                return Math.round(numFloat * 10) // 38 -> 380 | 38.5 -> 385
+                return Math.round(numFloat * 10)
             }
         }
-        return 0 // Fallback seguro se não achar número no título
+        return 0
     }
 
     override suspend fun loadLinks(
@@ -357,7 +354,6 @@ class AnimesDigitalProvider : MainAPI() {
         val document = app.get(realUrl).document
         val isMoviePage = realUrl.contains("/filme/", ignoreCase = true)
 
-        // Mapeia os nomes dos players para inferir a qualidade
         val playerTabs = document.select(".tabs_videos li").associate { it.attr("data-tab") to it.text() }
 
         val playerElements = if (isMoviePage) document.select("iframe[src]") else document.select(".tab-video iframe[src]")
@@ -376,20 +372,26 @@ class AnimesDigitalProvider : MainAPI() {
 
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
-                m3u8Url?.let { url ->
-                    callback.invoke(newExtractorLink(name, tabName, url, ExtractorLinkType.M3U8) {
-                        this.referer = realUrl 
-                        this.quality = quality
-                    })
+                if (m3u8Url != null) {
+                    // CORREÇÃO: Construtor direto para compatibilidade total
+                    callback.invoke(
+                        ExtractorLink(
+                            source = name,
+                            name = tabName,
+                            url = m3u8Url,
+                            referer = realUrl,
+                            quality = quality,
+                            type = ExtractorLinkType.M3U8
+                        )
+                    )
                     foundLinks = true
                 }
             } else if (iframeSrc.contains("animesdigital.org/aHR0")) {
                 val decodedPageUrl = decodeAnimesDigitalUrl(iframeSrc)
-                decodedPageUrl?.let { url ->
-                    val playerPage = app.get(url).document
+                if (decodedPageUrl != null) {
+                    val playerPage = app.get(decodedPageUrl).document
                     val allIframes = playerPage.select(".post-body iframe[src]")
                     
-                    // Filtro de propagandas, mantendo a lógica original de índice
                     val videoIframes = allIframes.filter { iframeElement ->
                         val src = iframeElement.attr("src").lowercase()
                         src.contains("blogger.com/video") || src.contains("drive.google.com") || 
@@ -399,11 +401,9 @@ class AnimesDigitalProvider : MainAPI() {
                     val targetList = if (videoIframes.isNotEmpty()) videoIframes else allIframes
                     val targetLink = targetList.getOrNull(episodeIndex)?.attr("src")
                     
-                    targetLink?.let { link ->
-                        if (link.isNotBlank()) {
-                            loadExtractor(link, url, subtitleCallback, callback)
-                            foundLinks = true
-                        }
+                    if (targetLink != null && targetLink.isNotBlank()) {
+                        loadExtractor(targetLink, decodedPageUrl, subtitleCallback, callback)
+                        foundLinks = true
                     }
                 }
             } else if (iframeSrc.isNotBlank()) {
@@ -426,12 +426,8 @@ class AnimesDigitalProvider : MainAPI() {
     private fun decodeAnimesDigitalUrl(iframeSrc: String): String? {
         return try {
             val base64Part = iframeSrc.substringAfter("animesdigital.org/").substringBefore("/")
-            val decoded = Base64.decode(base64Part, Base64.DEFAULT) // Compatível com Android antigo
+            val decoded = Base64.decode(base64Part, Base64.DEFAULT)
             String(decoded)
         } catch (e: Exception) { null }
-    }
-
-    private fun logError(message: String, e: Exception) {
-        println("[$name] $message: ${e.message}")
     }
 }
