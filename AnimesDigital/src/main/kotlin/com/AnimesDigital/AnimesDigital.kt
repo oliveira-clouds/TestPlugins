@@ -7,8 +7,10 @@ import com.lagradost.cloudstream3.app
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Document
 import org.json.JSONObject
-import java.util.Base64 
+import kotlin.io.encoding.Base64 
+import kotlin.io.encoding.ExperimentalEncodingApi
 
+@OptIn(ExperimentalEncodingApi::class) // Necessário para o Base64 nativo do Kotlin
 class AnimesDigitalProvider : MainAPI() {
     override var mainUrl = "https://animesdigital.org"
     override var name = "Animes Digital"
@@ -370,7 +372,6 @@ class AnimesDigitalProvider : MainAPI() {
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
                 if (m3u8Url != null) {
-                    // CORREÇÃO: Retorno à sintaxe newExtractorLink já que o erro Kotlin foi resolvido
                     callback.invoke(
                         newExtractorLink(
                             name, tabName, m3u8Url, ExtractorLinkType.M3U8
@@ -418,11 +419,11 @@ class AnimesDigitalProvider : MainAPI() {
         } catch (e: Exception) { null }
     }
 
-    // CORREÇÃO: Utilizando java.util.Base64 para evitar erro de compatibilidade multiplataforma
+    @OptIn(ExperimentalEncodingApi::class)
     private fun decodeAnimesDigitalUrl(iframeSrc: String): String? {
         return try {
             val base64Part = iframeSrc.substringAfter("animesdigital.org/").substringBefore("/")
-            val decoded = Base64.getDecoder().decode(base64Part)
+            val decoded = Base64.decode(base64Part)
             String(decoded)
         } catch (e: Exception) { null }
     }
