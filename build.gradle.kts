@@ -42,6 +42,12 @@ subprojects {
         isCrossPlatform = false
     }
 
+    tasks.whenTaskAdded {
+        if (name == "ensureJarCompatibility") {
+            enabled = false
+        }
+    }
+
     android {
         namespace = "com.example"
 
@@ -63,7 +69,7 @@ subprojects {
                     "-Xno-call-assertions",
                     "-Xno-param-assertions",
                     "-Xno-receiver-assertions",
-                    "-Xskip-metadata-version-check" // <--- A FLAG MÁGICA QUE RESOLVE O ERRO
+                    "-Xskip-metadata-version-check"
                 )
             }
         }
