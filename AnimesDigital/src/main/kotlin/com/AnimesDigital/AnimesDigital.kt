@@ -271,18 +271,38 @@ class AnimesDigitalProvider : MainAPI() {
         ?: title
     
     val currentEpisodeNumber = extractCurrentEpisodeNumber(url, title)
-    val urlWithIndex = "$url|#|$currentEpisodeNumber"
-    val currentEpisode = newEpisode(urlWithIndex) {
-        this.name = "Episódio $currentEpisodeNumber"
-        this.episode = currentEpisodeNumber
+
+    // Tenta extrair os episódios direto da sidebar lateral da página do episódio
+    val episodes = document.select(".sidebar_navigation_episodes a.episode_list_episodes_item").mapNotNull { epElement ->
+        val epUrl = epElement.attr("href").takeIf { it.isNotBlank() }?.let { fixUrl(it) } ?: return@mapNotNull null
+        val epNumStr = epElement.selectFirst(".episode_list_episodes_num")?.text()?.trim() ?: return@mapNotNull null
+        val epNum = epNumStr.toIntOrNull() ?: return@mapNotNull null
+        
+        val urlWithIndex = "$epUrl|#|$epNum"
+        newEpisode(urlWithIndex) {
+            this.name = "Episódio $epNumStr"
+            this.episode = epNum
+        }
     }
+
+    // Fallback: Se não achou a sidebar, usa o método antigo de episódio único
+    val finalEpisodes = if (episodes.isNotEmpty()) {
+        episodes
+    } else {
+        val urlWithIndex = "$url|#|$currentEpisodeNumber"
+        listOf(newEpisode(urlWithIndex) {
+            this.name = "Episódio $currentEpisodeNumber"
+            this.episode = currentEpisodeNumber
+        })
+    }
+
     
     val animeUrl = extractAnimeMainPageUrl(document, url)
 
     return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
         this.posterUrl = poster
         this.plot = description
-        addEpisodes(DubStatus.Subbed, listOf(currentEpisode))
+        addEpisodes(DubStatus.Subbed, finalEpisodes) // Usa a lista completa aqui
 
         // Adiciona recomendação para página principal
         if (animeUrl != null) {
