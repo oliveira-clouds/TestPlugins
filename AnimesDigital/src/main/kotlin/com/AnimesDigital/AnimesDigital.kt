@@ -7,7 +7,7 @@ import com.lagradost.cloudstream3.app
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Document
 import org.json.JSONObject
-import android.util.Base64
+import java.util.Base64 
 
 class AnimesDigitalProvider : MainAPI() {
     override var mainUrl = "https://animesdigital.org"
@@ -281,9 +281,8 @@ class AnimesDigitalProvider : MainAPI() {
                 val pageDocument = app.get(pageUrl, timeout = 10000L).document
                 val pageEpisodes = extractEpisodesFromPage(pageDocument)
                 
-                if (pageEpisodes.isEmpty()) {
-                    emptyPagesCount++
-                } else {
+                if (pageEpisodes.isEmpty()) emptyPagesCount++
+                else {
                     emptyPagesCount = 0
                     allEpisodes.addAll(pageEpisodes)
                 }
@@ -348,14 +347,12 @@ class AnimesDigitalProvider : MainAPI() {
         val realUrl = parts[0]
         val rawEpNum = parts.getOrNull(1)?.toIntOrNull() ?: 10
         
-        // Compatibilidade: Formato antigo (ex: 38) vs Formato novo (ex: 380)
         val episodeIndex = if (rawEpNum > 100) (rawEpNum / 10) - 1 else rawEpNum - 1
 
         val document = app.get(realUrl).document
         val isMoviePage = realUrl.contains("/filme/", ignoreCase = true)
 
         val playerTabs = document.select(".tabs_videos li").associate { it.attr("data-tab") to it.text() }
-
         val playerElements = if (isMoviePage) document.select("iframe[src]") else document.select(".tab-video iframe[src]")
         
         playerElements.forEach { iframe ->
@@ -373,16 +370,14 @@ class AnimesDigitalProvider : MainAPI() {
             if (iframeSrc.contains("anivideo.net") && iframeSrc.contains("m3u8")) {
                 val m3u8Url = extractM3u8Url(iframeSrc)
                 if (m3u8Url != null) {
-                    // CORREÇÃO: Construtor direto para compatibilidade total
+                    // CORREÇÃO: Retorno à sintaxe newExtractorLink já que o erro Kotlin foi resolvido
                     callback.invoke(
-                        ExtractorLink(
-                            source = name,
-                            name = tabName,
-                            url = m3u8Url,
-                            referer = realUrl,
-                            quality = quality,
-                            type = ExtractorLinkType.M3U8
-                        )
+                        newExtractorLink(
+                            name, tabName, m3u8Url, ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = realUrl
+                            this.quality = quality
+                        }
                     )
                     foundLinks = true
                 }
@@ -423,10 +418,11 @@ class AnimesDigitalProvider : MainAPI() {
         } catch (e: Exception) { null }
     }
 
+    // CORREÇÃO: Utilizando java.util.Base64 para evitar erro de compatibilidade multiplataforma
     private fun decodeAnimesDigitalUrl(iframeSrc: String): String? {
         return try {
             val base64Part = iframeSrc.substringAfter("animesdigital.org/").substringBefore("/")
-            val decoded = Base64.decode(base64Part, Base64.DEFAULT)
+            val decoded = Base64.getDecoder().decode(base64Part)
             String(decoded)
         } catch (e: Exception) { null }
     }
