@@ -264,7 +264,8 @@ class AnimesDigitalProvider : MainAPI() {
     }
 
 
-    private suspend fun loadEpisode(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
+
+        private suspend fun loadEpisode(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
     val title = document.selectFirst("meta[property=og:title]")?.attr("content") ?: return null
     val poster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
     val description = document.selectFirst("meta[property=og:description]")?.attr("content")
@@ -302,7 +303,19 @@ class AnimesDigitalProvider : MainAPI() {
         allEps.add(currentEp)
         allEps.addAll(sidebarEpisodes)
         
-        finalEpisodes = allEps.distinctBy { it.episode }.sortedByDescending { it.episode }
+        val uniqueEps = allEps.distinctBy { it.episode }.sortedByDescending { it.episode }
+        
+        // TRUQUE PARA SELECIONAR O EPISÓDIO CORRETO:
+        // O CloudStream seleciona automaticamente o episódio que está na posição 0 da lista.
+        // Como a lista está em ordem decrescente, se não tomarmos cuidado, ele selecionaria o último lançamento.
+        // Para forçar a seleção do episódio atual, nós o colocamos temporariamente no topo.
+        val selectedIndex = uniqueEps.indexOfFirst { it.episode == currentEpisodeNumber }
+        if (selectedIndex > 0) {
+            val selectedEp = uniqueEps.removeAt(selectedIndex)
+            uniqueEps.add(0, selectedEp)
+        }
+        
+        finalEpisodes = uniqueEps
     } else {
         // Fallback: Se não achou a sidebar, usa o método antigo de episódio único
         val urlWithIndex = "$url|#|$currentEpisodeNumber"
@@ -327,8 +340,8 @@ class AnimesDigitalProvider : MainAPI() {
             )
         }
     }
-    }
-         
+}
+    
 // Função auxiliar para extrair URL da página principal
 private fun extractAnimeMainPageUrl(document: org.jsoup.nodes.Document, currentUrl: String): String? {
     
