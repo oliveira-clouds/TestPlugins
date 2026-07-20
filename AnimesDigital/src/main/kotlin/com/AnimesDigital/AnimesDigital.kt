@@ -263,7 +263,8 @@ class AnimesDigitalProvider : MainAPI() {
         }
     }
 
-        private suspend fun loadEpisode(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
+
+    private suspend fun loadEpisode(url: String, document: org.jsoup.nodes.Document): LoadResponse? {
     val title = document.selectFirst("meta[property=og:title]")?.attr("content") ?: return null
     val poster = document.selectFirst("meta[property=og:image]")?.attr("content")?.let { fixUrlNull(it) }
     val description = document.selectFirst("meta[property=og:description]")?.attr("content")
@@ -273,7 +274,7 @@ class AnimesDigitalProvider : MainAPI() {
     
     val currentEpisodeNumber = extractCurrentEpisodeNumber(url, title)
     
-
+    // ===== INÍCIO DA MELHORIA: Carregar lista da sidebar =====
     val sidebarEpisodes = document.select(".sidebar_navigation_episodes a.episode_list_episodes_item").mapNotNull { epElement ->
         val epUrl = epElement.attr("href").takeIf { it.isNotBlank() }?.let { fixUrl(it) } ?: return@mapNotNull null
         val epNumStr = epElement.selectFirst(".episode_list_episodes_num")?.text()?.trim() ?: return@mapNotNull null
@@ -310,14 +311,12 @@ class AnimesDigitalProvider : MainAPI() {
             this.episode = currentEpisodeNumber
         })
     }
+    // ===== FIM DA MELHORIA =====
 
     return newAnimeLoadResponse(animeTitle, url, TvType.Anime) {
         this.posterUrl = poster
         this.plot = description
         addEpisodes(DubStatus.Subbed, finalEpisodes)
-
-        // Diz ao CloudStream qual é o episódio atual para ele selecionar automaticamente na lista
-        this.setUrl(url)
 
         // Adiciona recomendação para página principal
         if (animeUrl != null) {
@@ -328,8 +327,8 @@ class AnimesDigitalProvider : MainAPI() {
             )
         }
     }
-        }
-
+    }
+         
 // Função auxiliar para extrair URL da página principal
 private fun extractAnimeMainPageUrl(document: org.jsoup.nodes.Document, currentUrl: String): String? {
     
